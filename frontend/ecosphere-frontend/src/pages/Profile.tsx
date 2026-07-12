@@ -213,7 +213,6 @@ export const Profile = ({ activePage, onPageChange, darkMode, setDarkMode }: {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Stats Grid */}
-<<<<<<< HEAD
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <Card className="p-4 text-center hover:shadow-md transition-shadow cursor-default group border-teal-100 dark:border-teal-500/20 bg-gradient-to-b from-white dark:from-slate-800 to-teal-50/30 dark:to-teal-500/10" darkMode={darkMode}>
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform ${darkMode ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-600'}`}>
@@ -245,55 +244,6 @@ export const Profile = ({ activePage, onPageChange, darkMode, setDarkMode }: {
                 </div>
                 <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{loading ? '–' : profile?.csrEventsAttended || 0}</p>
                 <p className={`text-[11px] font-semibold uppercase tracking-wider mt-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>CSR Events</p>
-=======
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-              <Card className="hover:shadow-md transition-shadow cursor-default group" darkMode={darkMode}>
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-slate-700 text-green-400' : 'bg-teal-50 text-teal-600'}`}>
-                    <Star className="w-5 h-5" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Total XP</h3>
-                  <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{currentProfileStats.totalXP.toLocaleString()}</div>
-                </div>
-              </Card>
-
-              <Card className="hover:shadow-md transition-shadow cursor-default group" darkMode={darkMode}>
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-slate-700 text-green-400' : 'bg-green-50 text-green-600'}`}>
-                    <Leaf className="w-5 h-5" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>kg CO₂e Saved</h3>
-                  <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{currentProfileStats.carbonSaved}</div>
-                </div>
-              </Card>
-
-              <Card className="hover:shadow-md transition-shadow cursor-default group" darkMode={darkMode}>
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-slate-700 text-green-400' : 'bg-orange-50 text-orange-600'}`}>
-                    <Flame className="w-5 h-5" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Challenges</h3>
-                  <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{currentProfileStats.challengesCompleted}</div>
-                </div>
-              </Card>
-
-              <Card className="hover:shadow-md transition-shadow cursor-default group" darkMode={darkMode}>
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-slate-700 text-green-400' : 'bg-teal-50 text-teal-600'}`}>
-                    <Heart className="w-5 h-5" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>CSR Events</h3>
-                  <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{currentProfileStats.csrEventsAttended}</div>
-                </div>
->>>>>>> origin/main
               </Card>
             </div>
 
