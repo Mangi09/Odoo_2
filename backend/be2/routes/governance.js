@@ -1,17 +1,8 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { getDB } = require('../../shared/db');
+const { getDB, toDbId } = require('../../shared/db');
 
 const router = express.Router();
-
-function toObjectId(id) {
-  if (!id) return null;
-  try {
-    return new ObjectId(id);
-  } catch (e) {
-    return null;
-  }
-}
 
 // GET /api/governance/audits
 router.get('/audits', async (req, res) => {
@@ -23,7 +14,7 @@ router.get('/audits', async (req, res) => {
 
     const query = {};
     if (req.query.department_id) {
-      const deptId = toObjectId(req.query.department_id);
+      const deptId = toDbId(req.query.department_id);
       if (deptId) query.department_id = deptId;
     }
 
@@ -51,9 +42,9 @@ router.get('/audits', async (req, res) => {
 router.post('/audits', async (req, res) => {
   try {
     const db = getDB();
-    const { title, department_id, status, findings } = req.body;
+    const { title, department_id, status, findings, findings_summary, auditor_user_id, auditor_name, audit_date } = req.body;
 
-    const deptId = toObjectId(department_id);
+    const deptId = toDbId(department_id);
     if (!deptId) {
       return res.status(400).json({ success: false, error: 'Valid department_id is required' });
     }
@@ -62,12 +53,20 @@ router.post('/audits', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Title is required' });
     }
 
+    // Resolve org_id from department
+    const department = await db.collection('departments').findOne({ _id: deptId });
+    const orgId = department ? department.org_id : 'org-eco';
+
     const audit = {
-      title,
+      org_id: orgId,
       department_id: deptId,
-      status: status || 'pending',
-      findings: findings || '',
-      timestamp: new Date()
+      title,
+      auditor_user_id: auditor_user_id ? toDbId(auditor_user_id) : null,
+      auditor_name: auditor_name || 'System Auditor',
+      audit_date: audit_date ? new Date(audit_date) : new Date(),
+      findings_summary: findings_summary || findings || '',
+      status: status || 'PLANNED',
+      created_at: new Date()
     };
 
     const result = await db.collection('audits').insertOne(audit);
@@ -89,9 +88,9 @@ router.get('/issues', async (req, res) => {
     const skip = (page - 1) * limit;
 
     const query = {};
-    if (req.query.owner_id) {
-      const ownerId = toObjectId(req.query.owner_id);
-      if (ownerId) query.owner_id = ownerId;
+    if (req.query.owner_user_id || req.query.owner_id) {
+      const ownerId = toDbId(req.query.owner_user_id || req.query.owner_id);
+      if (ownerId) query.owner_user_id = ownerId;
     }
     if (req.query.status) {
       query.status = req.query.status;
@@ -108,7 +107,8 @@ router.get('/issues', async (req, res) => {
     const now = new Date();
     const enrichedIssues = issues.map(issue => {
       let overdue = false;
-      if (issue.status === 'open' && issue.due_date) {
+      const stat = (issue.status || '').toUpperCase();
+      if ((stat === 'OPEN' || stat === 'IN_PROGRESS' || stat === 'OVERDUE') && issue.due_date) {
         const dueDate = new Date(issue.due_date);
         if (dueDate < now) {
           overdue = true;
@@ -137,19 +137,19 @@ router.get('/issues', async (req, res) => {
 router.post('/issues', async (req, res) => {
   try {
     const db = getDB();
-    const { title, owner_id, due_date } = req.body;
+    const { title, owner_user_id, owner_id, due_date, audit_id, department_id, severity, description } = req.body;
 
-    //owner_id and due_date required (400 if missing)
-    if (!owner_id) {
-      return res.status(400).json({ success: false, error: 'owner_id is required' });
+    const ownerIdStr = owner_user_id || owner_id;
+    if (!ownerIdStr) {
+      return res.status(400).json({ success: false, error: 'owner_user_id is required' });
     }
     if (!due_date) {
       return res.status(400).json({ success: false, error: 'due_date is required' });
     }
 
-    const ownerId = toObjectId(owner_id);
+    const ownerId = toDbId(ownerIdStr);
     if (!ownerId) {
-      return res.status(400).json({ success: false, error: 'Valid owner_id is required' });
+      return res.status(400).json({ success: false, error: 'Valid owner_user_id is required' });
     }
 
     const parsedDueDate = new Date(due_date);
@@ -157,15 +157,24 @@ router.post('/issues', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid due_date format' });
     }
 
-    if (!title) {
-      return res.status(400).json({ success: false, error: 'Title is required' });
+    // Resolve department and org_id
+    const user = await db.collection('users').findOne({ _id: ownerId });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Owner user not found' });
     }
 
+    const deptId = department_id ? toDbId(department_id) : user.department_id;
+    const orgId = user.org_id || 'org-eco';
+
     const issue = {
-      title,
-      owner_id: ownerId,
+      org_id: orgId,
+      audit_id: audit_id ? toDbId(audit_id) : null,
+      department_id: deptId,
+      owner_user_id: ownerId,
+      severity: severity || 'MEDIUM',
+      description: description || title || 'Compliance Issue',
       due_date: parsedDueDate,
-      status: 'open',
+      status: 'Open',
       resolved_at: null,
       created_at: new Date()
     };

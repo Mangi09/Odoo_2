@@ -1,27 +1,18 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { getDB, runInTransaction } = require('../../shared/db');
+const { getDB, runInTransaction, toDbId } = require('../../shared/db');
 const { recordPointsTransaction } = require('../../shared/lib/points-ledger');
 const { evaluateBadges } = require('../../shared/lib/badges');
 
 const router = express.Router();
 
-function toObjectId(id) {
-  if (!id) return null;
-  try {
-    return new ObjectId(id);
-  } catch (e) {
-    return null;
-  }
-}
-
-// State transition map for challenges: draft -> active -> under_review -> completed, or archived anytime
+// State transition map for challenges: DRAFT -> ACTIVE -> UNDER_REVIEW -> COMPLETED, or ARCHIVED anytime
 const VALID_TRANSITIONS = {
-  'draft': ['active', 'archived'],
-  'active': ['under_review', 'archived'],
-  'under_review': ['completed', 'archived'],
-  'completed': ['archived'],
-  'archived': []
+  'DRAFT': ['ACTIVE', 'ARCHIVED'],
+  'ACTIVE': ['UNDER_REVIEW', 'ARCHIVED'],
+  'UNDER_REVIEW': ['COMPLETED', 'ARCHIVED'],
+  'COMPLETED': ['ARCHIVED'],
+  'ARCHIVED': []
 };
 
 // GET /api/gamification/challenges
@@ -34,7 +25,7 @@ router.get('/challenges', async (req, res) => {
 
     const query = {};
     if (req.query.status) {
-      query.status = req.query.status;
+      query.status = req.query.status.toUpperCase();
     }
 
     const total = await db.collection('challenges').countDocuments(query);
@@ -61,32 +52,37 @@ router.get('/challenges', async (req, res) => {
 router.post('/challenges', async (req, res) => {
   try {
     const db = getDB();
-    const { title, description, base_xp, difficulty, points, proof_required } = req.body;
+    const { title, description, base_xp, xp, difficulty, points, proof_required, evidence_required, category_id } = req.body;
 
     if (!title || !description) {
       return res.status(400).json({ success: false, error: 'Title and description are required' });
     }
 
-    const xp = parseInt(base_xp, 10);
-    const pts = parseInt(points, 10) || 0;
-    if (isNaN(xp) || xp <= 0) {
-      return res.status(400).json({ success: false, error: 'base_xp must be a positive integer' });
+    const xpVal = parseInt(xp || base_xp, 10);
+    if (isNaN(xpVal) || xpVal <= 0) {
+      return res.status(400).json({ success: false, error: 'xp must be a positive integer' });
     }
 
-    const diff = difficulty || 'medium';
-    if (!['easy', 'medium', 'hard'].includes(diff)) {
-      return res.status(400).json({ success: false, error: "Difficulty must be 'easy', 'medium', or 'hard'" });
+    const diff = (difficulty || 'MEDIUM').toUpperCase();
+    if (!['EASY', 'MEDIUM', 'HARD'].includes(diff)) {
+      return res.status(400).json({ success: false, error: "Difficulty must be 'EASY', 'MEDIUM', or 'HARD'" });
     }
+
+    // Resolve org_id
+    const catDoc = category_id ? await db.collection('categories').findOne({ _id: toDbId(category_id) }) : null;
+    const orgId = catDoc ? catDoc.org_id : 'org-eco';
 
     const challenge = {
+      org_id: orgId,
+      category_id: category_id ? toDbId(category_id) : null,
       title,
       description,
-      base_xp: xp,
-      points: pts,
+      xp: xpVal,
       difficulty: diff,
-      status: 'draft',
-      proof_required: !!proof_required,
-      created_at: new Date()
+      evidence_required: evidence_required !== undefined ? !!evidence_required : !!proof_required,
+      status: 'DRAFT',
+      created_at: new Date(),
+      updated_at: new Date()
     };
 
     const result = await db.collection('challenges').insertOne(challenge);
@@ -103,22 +99,23 @@ router.post('/challenges', async (req, res) => {
 router.patch('/challenges/:id/status', async (req, res) => {
   try {
     const db = getDB();
-    const challengeId = toObjectId(req.params.id);
+    const challengeId = toDbId(req.params.id);
     if (!challengeId) {
       return res.status(400).json({ success: false, error: 'Invalid challenge ID' });
     }
 
-    const { status } = req.body;
+    let { status } = req.body;
     if (!status) {
       return res.status(400).json({ success: false, error: 'status is required' });
     }
+    status = status.toUpperCase();
 
     const challenge = await db.collection('challenges').findOne({ _id: challengeId });
     if (!challenge) {
       return res.status(404).json({ success: false, error: 'Challenge not found' });
     }
 
-    const currentStatus = challenge.status || 'draft';
+    const currentStatus = (challenge.status || 'DRAFT').toUpperCase();
     const allowed = VALID_TRANSITIONS[currentStatus];
 
     if (!allowed || !allowed.includes(status)) {
@@ -151,13 +148,13 @@ router.patch('/challenges/:id/status', async (req, res) => {
 router.post('/challenges/:id/participate', async (req, res) => {
   try {
     const db = getDB();
-    const challengeId = toObjectId(req.params.id);
+    const challengeId = toDbId(req.params.id);
     if (!challengeId) {
       return res.status(400).json({ success: false, error: 'Invalid challenge ID' });
     }
 
     const empIdStr = req.headers['x-employee-id'] || req.body.employee_id;
-    const empId = toObjectId(empIdStr);
+    const empId = toDbId(empIdStr);
     if (!empId) {
       return res.status(400).json({ success: false, error: 'Valid employee context is required via x-employee-id header' });
     }
@@ -167,13 +164,14 @@ router.post('/challenges/:id/participate', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Challenge not found' });
     }
 
-    if (challenge.status !== 'active') {
+    const challengeStatus = (challenge.status || 'DRAFT').toUpperCase();
+    if (challengeStatus !== 'ACTIVE') {
       return res.status(400).json({ success: false, error: 'Cannot participate in a challenge that is not active' });
     }
 
-    const employee = await db.collection('employees').findOne({ _id: empId });
-    if (!employee) {
-      return res.status(404).json({ success: false, error: 'Employee not found' });
+    const user = await db.collection('users').findOne({ _id: empId });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Employee User not found' });
     }
 
     // Check if already participating
@@ -189,11 +187,14 @@ router.post('/challenges/:id/participate', async (req, res) => {
     const { proof_url } = req.body;
 
     const participation = {
-      employee_id: empId,
+      org_id: user.org_id || 'org-eco',
       challenge_id: challengeId,
-      status: 'joined',
+      employee_id: empId,
+      progress_percent: 0,
       proof_url: proof_url || '',
-      timestamp: new Date()
+      approval_status: 'Pending',
+      xp_awarded: 0,
+      joined_at: new Date()
     };
 
     const result = await db.collection('challenge_participations').insertOne(participation);
@@ -210,13 +211,13 @@ router.post('/challenges/:id/participate', async (req, res) => {
 router.post('/challenges/:id/complete', async (req, res) => {
   try {
     const db = getDB();
-    const challengeId = toObjectId(req.params.id);
+    const challengeId = toDbId(req.params.id);
     if (!challengeId) {
       return res.status(400).json({ success: false, error: 'Invalid challenge ID' });
     }
 
     const empIdStr = req.headers['x-employee-id'] || req.body.employee_id;
-    const empId = toObjectId(empIdStr);
+    const empId = toDbId(empIdStr);
     if (!empId) {
       return res.status(400).json({ success: false, error: 'Valid employee context is required' });
     }
@@ -229,7 +230,7 @@ router.post('/challenges/:id/complete', async (req, res) => {
     const resultData = await runInTransaction(async (session) => {
       // Look up current active participation
       const participation = await db.collection('challenge_participations').findOne(
-        { challenge_id: challengeId, employee_id: empId, status: 'joined' },
+        { challenge_id: challengeId, employee_id: empId, approval_status: 'Pending' },
         { session }
       );
 
@@ -237,33 +238,33 @@ router.post('/challenges/:id/complete', async (req, res) => {
         throw new Error('No active joined participation found for this employee and challenge');
       }
 
-      // Check evidence: proof_url is required if challenge proof_required is flagged
+      // Check evidence: proof_url is required if challenge evidence_required is flagged
       const submittedProofUrl = req.body.proof_url || participation.proof_url;
-      if (challenge.proof_required && (!submittedProofUrl || submittedProofUrl.trim() === '')) {
+      if (challenge.evidence_required && (!submittedProofUrl || submittedProofUrl.trim() === '')) {
         throw new Error('Evidence proof_url is required for this challenge, but was not provided');
       }
 
-      // XP = base_xp * difficulty multiplier
-      // easy 1x, medium 1.5x, hard 2x
+      // XP = challenge.xp * difficulty multiplier (EASY 1x, MEDIUM 1.5x, HARD 2x)
+      const diff = (challenge.difficulty || 'MEDIUM').toUpperCase();
       let multiplier = 1.0;
-      if (challenge.difficulty === 'medium') {
+      if (diff === 'MEDIUM') {
         multiplier = 1.5;
-      } else if (challenge.difficulty === 'hard') {
+      } else if (diff === 'HARD') {
         multiplier = 2.0;
       }
 
-      const baseXP = challenge.base_xp || 0;
-      const xpToAdd = Math.round(baseXP * multiplier);
-      const pointsToAdd = challenge.points || 0;
+      const challengeXP = challenge.xp || 0;
+      const xpToAdd = Math.round(challengeXP * multiplier);
 
-      // Credit XP/points via ledger
+      // Credit XP in ledger
       await recordPointsTransaction(
         db,
         empId,
-        pointsToAdd,
-        xpToAdd,
+        0, // 0 Points
+        xpToAdd, // XP
         `Completed challenge: ${challenge.title}`,
-        session
+        session,
+        { source_type: 'CHALLENGE_COMPLETION', source_id: participation._id }
       );
 
       // Run badge evaluation
@@ -271,23 +272,25 @@ router.post('/challenges/:id/complete', async (req, res) => {
 
       // Insert notification
       await db.collection('notifications').insertOne({
-        employee_id: empId,
+        org_id: participation.org_id || 'org-eco',
+        recipient_user_id: empId,
+        event_type: 'CHALLENGE_COMPLETE',
         title: 'Challenge Completed',
-        message: `Congratulations! You completed the challenge "${challenge.title}"! Credited ${xpToAdd} XP.`,
-        type: 'challenge_complete',
-        read: false,
-        timestamp: new Date()
+        body: `Congratulations! You completed the challenge "${challenge.title}"! Credited ${xpToAdd} XP.`,
+        entity_type: 'challenge',
+        entity_id: challengeId,
+        read_at: null,
+        created_at: new Date()
       }, { session });
 
-      // Mark participation as completed
+      // Mark participation as completed & approved
       await db.collection('challenge_participations').updateOne(
         { _id: participation._id },
         {
           $set: {
-            status: 'completed',
+            approval_status: 'Approved',
             proof_url: submittedProofUrl,
-            xp_credited: xpToAdd,
-            points_credited: pointsToAdd,
+            xp_awarded: xpToAdd,
             completed_at: new Date()
           }
         },
@@ -296,9 +299,8 @@ router.post('/challenges/:id/complete', async (req, res) => {
 
       return {
         participation_id: participation._id,
-        status: 'completed',
-        xp_credited: xpToAdd,
-        points_credited: pointsToAdd
+        approval_status: 'Approved',
+        xp_credited: xpToAdd
       };
     });
 
@@ -322,25 +324,33 @@ router.get('/leaderboard', async (req, res) => {
     const query = {};
 
     if (scope === 'department') {
-      const deptId = toObjectId(req.query.department_id);
+      const deptId = toDbId(req.query.department_id);
       if (!deptId) {
         return res.status(400).json({ success: false, error: 'department_id is required when scope is department' });
       }
       query.department_id = deptId;
     }
 
-    const total = await db.collection('employees').countDocuments(query);
-    const employees = await db.collection('employees')
+    const total = await db.collection('users').countDocuments(query);
+    const users = await db.collection('users')
       .find(query)
-      .project({ name: 1, points: 1, xp: 1, department_id: 1 })
-      .sort({ xp: -1, points: -1 })
+      .project({ full_name: 1, points_balance: 1, xp_total: 1, department_id: 1 })
+      .sort({ xp_total: -1, points_balance: -1 })
       .skip(skip)
       .limit(limit)
       .toArray();
 
+    // Map for frontend compatibility
+    const enriched = users.map(u => ({
+      ...u,
+      name: u.full_name,
+      xp: u.xp_total,
+      points: u.points_balance
+    }));
+
     return res.status(200).json({
       success: true,
-      data: employees,
+      data: enriched,
       scope,
       page,
       limit,
@@ -367,16 +377,22 @@ router.get('/rewards', async (req, res) => {
 router.post('/rewards', async (req, res) => {
   try {
     const db = getDB();
-    const { title, points_cost, stock } = req.body;
+    const { title, name, points_cost, points_required, stock } = req.body;
 
-    if (!title || isNaN(points_cost) || isNaN(stock)) {
-      return res.status(400).json({ success: false, error: 'Title, points_cost, and stock are required' });
+    const rewardName = name || title;
+    const pts = parseInt(points_required || points_cost, 10);
+    if (!rewardName || isNaN(pts) || isNaN(stock)) {
+      return res.status(400).json({ success: false, error: 'Name, points_required, and stock are required' });
     }
 
     const reward = {
-      title,
-      points_cost: parseInt(points_cost, 10),
-      stock: parseInt(stock, 10)
+      org_id: 'org-eco',
+      name: rewardName,
+      points_required: pts,
+      stock: parseInt(stock, 10),
+      status: 'Active',
+      created_at: new Date(),
+      updated_at: new Date()
     };
 
     const result = await db.collection('rewards').insertOne(reward);
@@ -392,20 +408,19 @@ router.post('/rewards', async (req, res) => {
 router.post('/rewards/:id/redeem', async (req, res) => {
   try {
     const db = getDB();
-    const rewardId = toObjectId(req.params.id);
+    const rewardId = toDbId(req.params.id);
     if (!rewardId) {
       return res.status(400).json({ success: false, error: 'Invalid reward ID' });
     }
 
     const empIdStr = req.headers['x-employee-id'] || req.body.employee_id;
-    const empId = toObjectId(empIdStr);
+    const empId = toDbId(empIdStr);
     if (!empId) {
-      return res.status(400).json({ success: false, error: 'Valid employee context is required via x-employee-id header' });
+      return res.status(400).json({ success: false, error: 'Valid employee context is required' });
     }
 
     const resultData = await runInTransaction(async (session) => {
       // 1. UPDATE rewards SET stock=stock-1 WHERE id=$1 AND stock>0 RETURNING *,
-      // We use findOneAndUpdate with filter query to ensure stock > 0
       const rewardResult = await db.collection('rewards').findOneAndUpdate(
         { _id: rewardId, stock: { $gt: 0 } },
         { $inc: { stock: -1 } },
@@ -417,39 +432,42 @@ router.post('/rewards/:id/redeem', async (req, res) => {
         throw new Error('Reward is out of stock or does not exist');
       }
 
-      // 2. Check points balance in the same transaction
-      const employee = await db.collection('employees').findOne({ _id: empId }, { session });
-      if (!employee) {
-        throw new Error('Employee record not found');
+      // 2. Check points balance in the same transaction (from users collection)
+      const user = await db.collection('users').findOne({ _id: empId }, { session });
+      if (!user) {
+        throw new Error('Employee User record not found');
       }
 
-      if ((employee.points || 0) < reward.points_cost) {
-        throw new Error(`Insufficient points: reward costs ${reward.points_cost} points, but employee only has ${employee.points || 0}`);
+      if ((user.points_balance || 0) < reward.points_required) {
+        throw new Error(`Insufficient points: reward costs ${reward.points_required} points, but employee only has ${user.points_balance || 0}`);
       }
 
       // 3. Deduct points via points ledger
       await recordPointsTransaction(
         db,
         empId,
-        -reward.points_cost,
-        0,
-        `Redeemed reward: ${reward.title}`,
-        session
+        -reward.points_required,
+        0, // 0 XP
+        `Redeemed reward: ${reward.name}`,
+        session,
+        { source_type: 'REWARD_REDEMPTION', source_id: rewardId }
       );
 
       // 4. Log redemption
       const redemption = {
+        org_id: user.org_id || 'org-eco',
         employee_id: empId,
         reward_id: rewardId,
-        points_cost: reward.points_cost,
+        points_spent: reward.points_required,
+        status: 'FULFILLED',
         redeemed_at: new Date()
       };
       await db.collection('reward_redemptions').insertOne(redemption, { session });
 
       return {
         reward_id: rewardId,
-        reward_title: reward.title,
-        points_deducted: reward.points_cost,
+        reward_title: reward.name,
+        points_deducted: reward.points_required,
         remaining_stock: reward.stock
       };
     });

@@ -25,6 +25,15 @@ function getClient() {
   return client;
 }
 
+const { ObjectId } = require('mongodb');
+function toDbId(id) {
+  if (!id) return null;
+  if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return new ObjectId(id);
+  }
+  return id;
+}
+
 async function runInTransaction(callback) {
   if (!client) throw new Error('MongoClient not initialized.');
   const session = client.startSession();
@@ -57,5 +66,6 @@ module.exports = {
   connectDB,
   getDB,
   getClient,
+  toDbId,
   runInTransaction
 };
