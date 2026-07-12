@@ -1,40 +1,45 @@
 import React, { useState } from 'react';
-import { 
-  Shield, AlertTriangle, FileText, CheckCircle2, Search, Clock, 
+import {
+  Shield, AlertTriangle, FileText, CheckCircle2, Search, Clock,
   Activity, BookOpen, UserCheck, Plus, CheckCircle
 } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { 
-  initialGovernanceSummary, initialAudits, initialComplianceIssues, initialPolicies, governanceActivities 
+import {
+  initialGovernanceSummary, initialAudits, initialComplianceIssues, initialPolicies, governanceActivities
 } from '../data/mockGovernanceData';
 import type { Audit, ComplianceIssue, Policy } from '../types/governance';
 import type { Activity as ActivityType } from '../types/dashboard';
 
 // Reusable Components
-const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 ${className}`}>
+const Card = ({ children, className = '', darkMode = false }: { children: React.ReactNode; className?: string; darkMode?: boolean }) => (
+  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-green-100'} rounded-2xl shadow-sm border p-6 ${className}`}>
     {children}
   </div>
 );
 
-const Badge = ({ children, variant = 'default' }: { children: React.ReactNode, variant?: 'success' | 'warning' | 'error' | 'info' | 'default' }) => {
+const Badge = ({ children, variant = 'default', darkMode = false }: { children: React.ReactNode; variant?: 'success' | 'warning' | 'error' | 'info' | 'default'; darkMode?: boolean }) => {
   const styles = {
-    success: 'bg-green-100 text-green-700',
-    warning: 'bg-orange-100 text-orange-700',
-    error: 'bg-red-100 text-red-700',
-    info: 'bg-blue-100 text-blue-700',
-    default: 'bg-slate-100 text-slate-700'
+    success: darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-700',
+    warning: darkMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-50 text-orange-700',
+    error: darkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-700',
+    info: darkMode ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-700',
+    default: darkMode ? 'bg-slate-700 text-slate-300' : 'bg-gray-50 text-gray-700'
   };
   return <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[variant]}`}>{children}</span>;
 };
 
-export const Governance = ({ activePage, onPageChange }: { activePage?: string, onPageChange?: (page: string) => void }) => {
+export const Governance = ({ activePage, onPageChange, darkMode, setDarkMode }: {
+  activePage?: string;
+  onPageChange?: (page: string) => void;
+  darkMode?: boolean;
+  setDarkMode?: (mode: boolean) => void;
+}) => {
   const [summary, setSummary] = useState(initialGovernanceSummary);
   const [audits] = useState<Audit[]>(initialAudits);
   const [issues, setIssues] = useState<ComplianceIssue[]>(initialComplianceIssues);
   const [policies, setPolicies] = useState<Policy[]>(initialPolicies);
   const [recentLog, setRecentLog] = useState<ActivityType[]>(governanceActivities);
-  const [notification, setNotification] = useState<{msg: string, type: 'success'|'info'} | null>(null);
+  const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'info' } | null>(null);
 
   const showNotification = (msg: string, type: 'success' | 'info' = 'success') => {
     setNotification({ msg, type });
@@ -50,20 +55,20 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
       dueDate: new Date().toISOString().split('T')[0],
       status: 'Open'
     };
-    
+
     setIssues([newIssue, ...issues]);
-    setSummary(prev => ({ 
-      ...prev, 
-      openIssues: prev.openIssues + 1, 
-      highSeverityIssues: prev.highSeverityIssues + 1 
+    setSummary(prev => ({
+      ...prev,
+      openIssues: prev.openIssues + 1,
+      highSeverityIssues: prev.highSeverityIssues + 1
     }));
-    
+
     showNotification('New compliance issue reported.', 'info');
   };
 
   const handleResolveIssue = (issueId: string, severity: string) => {
     setIssues(prev => prev.map(i => i.id === issueId ? { ...i, status: 'Resolved' } : i));
-    
+
     setSummary(prev => ({
       ...prev,
       openIssues: Math.max(0, prev.openIssues - 1),
@@ -88,7 +93,7 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
 
   const handleAcknowledgePolicy = (policyId: string) => {
     setPolicies(prev => prev.map(p => p.id === policyId ? { ...p, isAcknowledged: true } : p));
-    
+
     // Recalculate percentage
     setPolicies(newPolicies => {
       const ackCount = newPolicies.filter(p => p.isAcknowledged).length;
@@ -114,12 +119,13 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
   };
 
   return (
-    <DashboardLayout activePage={activePage} onPageChange={onPageChange}>
-      <div className="max-w-7xl mx-auto space-y-8 relative">
-        
+    <DashboardLayout activePage={activePage} onPageChange={onPageChange} darkMode={darkMode} setDarkMode={setDarkMode}>
+      <div className="max-w-7xl mx-auto space-y-6 relative">
+
         {/* Notification Toast */}
         {notification && (
-          <div className="fixed top-20 right-8 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2">
+          <div className={`fixed top-20 right-8 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2 ${darkMode ? 'bg-slate-700 text-slate-100' : 'bg-gray-800 text-white'
+            }`}>
             {notification.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-green-400" />
             ) : (
@@ -132,19 +138,21 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Governance & Compliance</h1>
-            <p className="text-slate-500 mt-1 text-sm">Monitor audits, manage policies, and track organizational compliance.</p>
+            <h1 className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Governance & Compliance</h1>
+            <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Monitor audits, manage policies, and track organizational compliance.</p>
           </div>
-          
+
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={handleReportIssue}
-              className="px-4 py-2.5 bg-red-50 text-red-700 border border-red-100 rounded-xl text-sm font-medium hover:bg-red-100 transition-all flex items-center gap-2"
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${darkMode ? 'bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30' : 'bg-red-50 text-red-700 border border-red-100 hover:bg-red-100'
+                }`}
             >
               <AlertTriangle className="w-4 h-4" />
               Report Issue
             </button>
-            <button className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2">
+            <button className={`px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-all shadow-sm flex items-center gap-2 ${darkMode ? 'bg-slate-600 text-slate-100' : 'bg-gray-900 text-white'
+              }`}>
               <Plus className="w-4 h-4" />
               New Policy
             </button>
@@ -152,76 +160,82 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-50 text-orange-600'
+                }`}>
                 <FileText className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">Open Issues</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.openIssues}</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Open Issues</h3>
+              <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{summary.openIssues}</div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600'
+                }`}>
                 <AlertTriangle className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">High Severity</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.highSeverityIssues}</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>High Severity</h3>
+              <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{summary.highSeverityIssues}</div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-600'
+                }`}>
                 <Clock className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">Upcoming Audits</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.upcomingAudits}</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Upcoming Audits</h3>
+              <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{summary.upcomingAudits}</div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-600'
+                }`}>
                 <Shield className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">Policy Compliance</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.policyComplianceRate}%</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Policy Compliance</h3>
+              <div className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{summary.policyComplianceRate}%</div>
             </div>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Main Area: Tables */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Compliance Issues Table */}
-            <Card>
+            <Card darkMode={darkMode}>
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-slate-900">Active Compliance Issues</h3>
+                <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Active Compliance Issues</h3>
                 <div className="relative hidden sm:block">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="Search issues..." 
-                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none w-48"
+                  <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`} />
+                  <input
+                    type="text"
+                    placeholder="Search issues..."
+                    className={`pl-9 pr-4 py-2 rounded-lg text-sm transition-all outline-none w-48 ${darkMode ? 'bg-slate-700 border border-slate-600 text-slate-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20' : 'bg-gray-50 border border-gray-200 text-gray-700 focus:bg-white focus:border-green-500 focus:ring-2 focus:ring-green-200'
+                      }`}
                   />
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-slate-600">
-                  <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                <table className={`w-full text-sm text-left ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+                  <thead className={`text-xs uppercase border-b ${darkMode ? 'text-slate-400 bg-slate-700 border-slate-600' : 'text-gray-500 bg-gray-50 border-gray-200'
+                    }`}>
                     <tr>
                       <th className="px-4 py-3 font-medium">Issue</th>
                       <th className="px-4 py-3 font-medium">Severity</th>
@@ -232,24 +246,25 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                   </thead>
                   <tbody>
                     {issues.filter(i => i.status !== 'Resolved').map(issue => (
-                      <tr key={issue.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                      <tr key={issue.id} className={`border-b transition-colors ${darkMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-gray-100 hover:bg-gray-50/50'
+                        }`}>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{issue.title}</div>
-                          <div className="text-xs text-slate-500">Owner: {issue.owner}</div>
+                          <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{issue.title}</div>
+                          <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Owner: {issue.owner}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={issue.severity === 'High' ? 'error' : issue.severity === 'Medium' ? 'warning' : 'info'}>
+                          <Badge variant={issue.severity === 'High' ? 'error' : issue.severity === 'Medium' ? 'warning' : 'info'} darkMode={darkMode}>
                             {issue.severity}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 font-medium">{issue.dueDate}</td>
                         <td className="px-4 py-3">
-                          <Badge variant={issue.status === 'Open' ? 'warning' : 'info'}>{issue.status}</Badge>
+                          <Badge variant={issue.status === 'Open' ? 'warning' : 'info'} darkMode={darkMode}>{issue.status}</Badge>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button 
+                          <button
                             onClick={() => handleResolveIssue(issue.id, issue.severity)}
-                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                            className={`text-xs font-semibold ${darkMode ? 'text-green-400 hover:text-green-300' : 'text-green-600 hover:text-green-800'}`}
                           >
                             Resolve
                           </button>
@@ -258,7 +273,7 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                     ))}
                     {issues.filter(i => i.status !== 'Resolved').length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                        <td colSpan={5} className={`px-4 py-8 text-center ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
                           No active issues! Great job.
                         </td>
                       </tr>
@@ -269,13 +284,14 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
             </Card>
 
             {/* Audits Table */}
-            <Card>
+            <Card darkMode={darkMode}>
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-slate-900">Audit Schedule</h3>
+                <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Audit Schedule</h3>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-slate-600">
-                  <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                <table className={`w-full text-sm text-left ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+                  <thead className={`text-xs uppercase border-b ${darkMode ? 'text-slate-400 bg-slate-700 border-slate-600' : 'text-gray-500 bg-gray-50 border-gray-200'
+                    }`}>
                     <tr>
                       <th className="px-4 py-3 font-medium">Audit Title</th>
                       <th className="px-4 py-3 font-medium">Auditor</th>
@@ -285,15 +301,16 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                   </thead>
                   <tbody>
                     {audits.map(audit => (
-                      <tr key={audit.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                      <tr key={audit.id} className={`border-b transition-colors ${darkMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-gray-100 hover:bg-gray-50/50'
+                        }`}>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{audit.title}</div>
-                          <div className="text-xs text-slate-500">{audit.department}</div>
+                          <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{audit.title}</div>
+                          <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{audit.department}</div>
                         </td>
                         <td className="px-4 py-3">{audit.auditor}</td>
                         <td className="px-4 py-3 font-medium">{audit.date}</td>
                         <td className="px-4 py-3">
-                          <Badge variant={audit.status === 'Completed' ? 'success' : audit.status === 'In Progress' ? 'info' : 'default'}>
+                          <Badge variant={audit.status === 'Completed' ? 'success' : audit.status === 'In Progress' ? 'info' : 'default'} darkMode={darkMode}>
                             {audit.status}
                           </Badge>
                         </td>
@@ -308,29 +325,31 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
 
           {/* Right Sidebar */}
           <div className="space-y-6">
-            
+
             {/* Policies */}
-            <Card>
+            <Card darkMode={darkMode}>
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-indigo-500" /> My Policies
+                <h3 className={`text-base font-semibold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                  <BookOpen className="w-5 h-5 text-green-500" /> My Policies
                 </h3>
               </div>
               <div className="space-y-4">
                 {policies.map(policy => (
-                  <div key={policy.id} className="p-3 rounded-xl border border-slate-100 flex flex-col gap-3">
+                  <div key={policy.id} className={`p-3 rounded-xl border flex flex-col gap-3 ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-100'
+                    }`}>
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-900">{policy.title}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Version {policy.version} • Updated {policy.lastUpdated}</p>
+                      <h4 className={`text-sm font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{policy.title}</h4>
+                      <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Version {policy.version} • Updated {policy.lastUpdated}</p>
                     </div>
                     {policy.isAcknowledged ? (
-                      <div className="flex items-center gap-2 text-xs font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-lg justify-center">
+                      <div className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg justify-center ${darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-600'
+                        }`}>
                         <CheckCircle className="w-4 h-4" /> Acknowledged
                       </div>
                     ) : (
-                      <button 
+                      <button
                         onClick={() => handleAcknowledgePolicy(policy.id)}
-                        className="flex items-center justify-center gap-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors"
+                        className={`flex items-center justify-center gap-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg transition-colors`}
                       >
                         <UserCheck className="w-4 h-4" /> Acknowledge
                       </button>
@@ -341,26 +360,27 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
             </Card>
 
             {/* Activity Stream */}
-            <Card>
+            <Card darkMode={darkMode}>
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-slate-400" /> Recent Activity
+                <h3 className={`text-base font-semibold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                  <Activity className={`w-5 h-5 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`} /> Recent Activity
                 </h3>
               </div>
               <div className="space-y-5">
                 {recentLog.map(activity => (
                   <div key={activity.id} className="flex gap-3">
                     <div className="mt-0.5">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600'
+                        }`}>
                         <Activity className="w-4 h-4" />
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-800">
-                        <span className="font-medium text-slate-900">{activity.user}</span> {activity.action}
+                      <p className={`text-sm ${darkMode ? 'text-slate-300' : 'text-gray-800'}`}>
+                        <span className={`font-medium ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{activity.user}</span> {activity.action}
                       </p>
-                      <p className="text-sm font-medium text-slate-900 mt-0.5 line-clamp-1">{activity.target}</p>
-                      <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                      <p className={`text-sm font-medium mt-0.5 line-clamp-1 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{activity.target}</p>
+                      <div className={`flex items-center gap-1 mt-1 text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
                         <Clock className="w-3 h-3" /> {activity.time}
                       </div>
                     </div>
