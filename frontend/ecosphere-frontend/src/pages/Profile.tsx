@@ -67,8 +67,34 @@ export const Profile = ({ activePage, onPageChange, darkMode, setDarkMode }: {
         profileApi.history(activeTab === 'All' ? undefined : activeTab),
         gamApi.badges()
       ]);
-      setProfile(prof as unknown as ProfileData);
-      setHistory(hist as HistoryItem[]);
+      const profRaw = prof as any;
+      const mappedProfile: ProfileData = {
+        name: profRaw.name || '',
+        email: profRaw.email || '',
+        role: profRaw.role || '',
+        department: profRaw.department || 'HQ',
+        location: profRaw.location || 'San Francisco, CA',
+        joinDate: profRaw.joinedAt || '',
+        xp: profRaw.xp || 0,
+        points: profRaw.points || 0,
+        badgesEarned: profRaw.badges || 0,
+        carbonSaved: profRaw.carbonSaved || 0,
+        challengesCompleted: profRaw.challengesCompleted || 0,
+        csrEventsAttended: profRaw.csrEvents || 0,
+        avatarInitials: profRaw.avatarInitials || (profRaw.name || '?').slice(0, 2).toUpperCase()
+      };
+      setProfile(mappedProfile);
+
+      const mappedHistory = ((hist as any[]) || []).map(h => ({
+        id: h.id || `hist-${Math.random()}`,
+        title: h.title || 'Activity',
+        type: h.type || 'Challenge',
+        status: h.status || 'Approved',
+        date: h.date || new Date().toISOString(),
+        points: h.value || 0
+      }));
+      setHistory(mappedHistory);
+
       setBadges(bds as BadgeItem[]);
     } catch (err) {
       console.error('Profile load error:', err);
