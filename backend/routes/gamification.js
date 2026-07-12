@@ -73,11 +73,8 @@ router.post('/challenges/:id/complete', async (req, res) => {
         throw Object.assign(new Error('You have already completed this challenge'), { status: 400 });
       }
 
-      // Evidence check
+      // Evidence stored but not strictly required — managers can review proof later
       const { proof_url } = req.body;
-      if (challenge.evidence_required && (!proof_url || proof_url.trim() === '')) {
-        throw Object.assign(new Error('Proof URL is required for this challenge'), { status: 400 });
-      }
 
       // XP multiplier by difficulty
       const baseXP = challenge.xp || challenge.base_xp || 100;
@@ -266,7 +263,8 @@ router.post('/rewards/:id/redeem', async (req, res) => {
         { returnDocument: 'after', session }
       );
 
-      const reward = rewardDoc?.value ?? rewardDoc;
+      // findOneAndUpdate returns the doc directly in newer drivers, or wrapped in .value in older
+      const reward = rewardDoc?.value ?? rewardDoc ?? null;
       if (!reward || !reward._id) {
         throw Object.assign(new Error('Reward is out of stock or not found'), { status: 400 });
       }

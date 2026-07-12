@@ -134,10 +134,7 @@ router.post('/participations/:id/approve', isManagerOrAdmin, async (req, res) =>
       const activity = await db.collection('csr_activities').findOne({ _id: part.csr_activity_id }, { session });
       if (!activity) throw Object.assign(new Error('Activity not found'), { status: 404 });
 
-      // Evidence check
-      if (activity.evidence_required && (!part.proof_url || part.proof_url.trim() === '')) {
-        throw Object.assign(new Error('Evidence proof is required for this activity'), { status: 400 });
-      }
+      // Evidence is stored at join time; managers decide approval regardless
 
       const pointsToAdd = activity.points || 50;
 

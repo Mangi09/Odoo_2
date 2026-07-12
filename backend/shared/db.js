@@ -48,7 +48,9 @@ async function runInTransaction(callback) {
         err.message.includes('Transaction numbers') || 
         err.message.includes('session') || 
         err.message.includes('ReplicaSet') || 
-        err.message.includes('replica set')
+        err.message.includes('replica set') ||
+        err.message.includes('retryable writes') ||
+        err.message.includes('retryWrites')
       )) {
         console.warn('Fallback to non-transactional mode due to MongoDB configuration:', err.message);
         result = await callback(null);
