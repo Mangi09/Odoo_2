@@ -1,19 +1,9 @@
 const express = require('express');
-const { ObjectId } = require('mongodb');
-const { getDB, runInTransaction } = require('../../shared/db');
+const { getDB, runInTransaction, toDbId } = require('../../shared/db');
 const { recordPointsTransaction } = require('../../shared/lib/points-ledger');
 const { evaluateBadges } = require('../../shared/lib/badges');
 
 const router = express.Router();
-
-function toObjectId(id) {
-  if (!id) return null;
-  try {
-    return new ObjectId(id);
-  } catch (e) {
-    return null;
-  }
-}
 
 // GET /api/social/activities
 router.get('/activities', async (req, res) => {
@@ -24,8 +14,9 @@ router.get('/activities', async (req, res) => {
     const skip = (page - 1) * limit;
 
     const query = {};
-    if (req.query.category) {
-      query.category = req.query.category;
+    if (req.query.category_id) {
+      const catId = toDbId(req.query.category_id);
+      if (catId) query.category_id = catId;
     }
 
     const total = await db.collection('csr_activities').countDocuments(query);
@@ -52,10 +43,23 @@ router.get('/activities', async (req, res) => {
 router.post('/activities', async (req, res) => {
   try {
     const db = getDB();
-    const { title, description, category, points, xp, difficulty, proof_required } = req.body;
+    const { title, description, category_id, category, points, proof_required, evidence_required, status, department_id } = req.body;
 
-    if (category !== 'CSR_ACTIVITY') {
-      return res.status(400).json({ success: false, error: 'Category type must be exactly CSR_ACTIVITY' });
+    const catSearch = toDbId(category_id || category);
+    if (!catSearch) {
+      return res.status(400).json({ success: false, error: 'Category identifier (category_id or category) is required' });
+    }
+
+    // Resolve category type
+    const categoryDoc = await db.collection('categories').findOne({
+      $or: [
+        { _id: catSearch },
+        { name: category_id || category }
+      ]
+    });
+
+    if (!categoryDoc || categoryDoc.type !== 'CSR_ACTIVITY') {
+      return res.status(400).json({ success: false, error: 'Category type must be CSR_ACTIVITY' });
     }
 
     if (!title || !description) {
@@ -63,19 +67,21 @@ router.post('/activities', async (req, res) => {
     }
 
     const pts = parseInt(points, 10);
-    const xpVal = parseInt(xp, 10);
-    if (isNaN(pts) || pts < 0 || isNaN(xpVal) || xpVal < 0) {
-      return res.status(400).json({ success: false, error: 'Points and XP must be non-negative integers' });
+    if (isNaN(pts) || pts < 0) {
+      return res.status(400).json({ success: false, error: 'Points must be a non-negative integer' });
     }
 
     const activity = {
+      org_id: categoryDoc.org_id || 'org-eco',
+      category_id: categoryDoc._id,
+      department_id: department_id ? toDbId(department_id) : null,
       title,
       description,
-      category: 'CSR_ACTIVITY',
       points: pts,
-      xp: xpVal,
-      difficulty: difficulty || 'medium',
-      proof_required: !!proof_required
+      evidence_required: evidence_required !== undefined ? !!evidence_required : !!proof_required,
+      status: status || 'OPEN',
+      created_at: new Date(),
+      updated_at: new Date()
     };
 
     const result = await db.collection('csr_activities').insertOne(activity);
@@ -99,27 +105,27 @@ router.get('/participations', async (req, res) => {
     const query = {};
 
     if (req.query.department_id) {
-      const deptId = toObjectId(req.query.department_id);
+      const deptId = toDbId(req.query.department_id);
       if (deptId) {
-        const employees = await db.collection('employees').find({ department_id: deptId }).toArray();
-        const employeeIds = employees.map(emp => emp._id);
-        query.employee_id = { $in: employeeIds };
+        const users = await db.collection('users').find({ department_id: deptId }).toArray();
+        const userIds = users.map(u => u._id);
+        query.employee_id = { $in: userIds };
       } else {
         return res.status(200).json({ success: true, data: [], page, limit, total: 0 });
       }
     }
 
-    if (req.query.status) {
-      query.status = req.query.status;
+    if (req.query.status || req.query.approval_status) {
+      query.approval_status = req.query.approval_status || req.query.status;
     }
 
     if (req.query.start_date || req.query.end_date) {
-      query.timestamp = {};
+      query.created_at = {};
       if (req.query.start_date) {
-        query.timestamp.$gte = new Date(req.query.start_date);
+        query.created_at.$gte = new Date(req.query.start_date);
       }
       if (req.query.end_date) {
-        query.timestamp.$lte = new Date(req.query.end_date);
+        query.created_at.$lte = new Date(req.query.end_date);
       }
     }
 
@@ -128,12 +134,20 @@ router.get('/participations', async (req, res) => {
       .find(query)
       .skip(skip)
       .limit(limit)
-      .sort({ timestamp: -1 })
+      .sort({ created_at: -1 })
       .toArray();
+
+    // Map fields for compatibility
+    const enriched = participations.map(p => ({
+      ...p,
+      status: p.approval_status,
+      proof_url: p.proof_url || p.proof_file_name,
+      points_credited: p.points_earned
+    }));
 
     return res.status(200).json({
       success: true,
-      data: participations,
+      data: enriched,
       page,
       limit,
       total
@@ -148,13 +162,13 @@ router.get('/participations', async (req, res) => {
 router.post('/activities/:id/participate', async (req, res) => {
   try {
     const db = getDB();
-    const activityId = toObjectId(req.params.id);
+    const activityId = toDbId(req.params.id);
     if (!activityId) {
       return res.status(400).json({ success: false, error: 'Invalid activity ID' });
     }
 
     const empIdStr = req.headers['x-employee-id'] || req.body.employee_id;
-    const empId = toObjectId(empIdStr);
+    const empId = toDbId(empIdStr);
     if (!empId) {
       return res.status(400).json({ success: false, error: 'Valid employee context is required via x-employee-id header' });
     }
@@ -164,21 +178,24 @@ router.post('/activities/:id/participate', async (req, res) => {
       return res.status(404).json({ success: false, error: 'CSR Activity not found' });
     }
 
-    const employee = await db.collection('employees').findOne({ _id: empId });
-    if (!employee) {
-      return res.status(404).json({ success: false, error: 'Employee not found' });
+    const user = await db.collection('users').findOne({ _id: empId });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Employee User not found' });
     }
 
-    const { proof_url } = req.body;
+    const { proof_url, proof_file_name } = req.body;
+    const proof = proof_url || proof_file_name || '';
 
     const participation = {
+      org_id: user.org_id || 'org-eco',
       employee_id: empId,
-      activity_id: activityId,
-      status: 'pending',
-      proof_url: proof_url || '',
-      points_credited: 0,
-      xp_credited: 0,
-      timestamp: new Date()
+      csr_activity_id: activityId,
+      proof_url: proof,
+      proof_file_name: proof, // for compatibility
+      approval_status: 'Pending',
+      points_earned: 0,
+      completion_date: new Date(),
+      created_at: new Date()
     };
 
     const result = await db.collection('employee_participations').insertOne(participation);
@@ -195,65 +212,70 @@ router.post('/activities/:id/participate', async (req, res) => {
 router.post('/participations/:id/approve', async (req, res) => {
   try {
     const db = getDB();
-    const partId = toObjectId(req.params.id);
+    const partId = toDbId(req.params.id);
     if (!partId) {
       return res.status(400).json({ success: false, error: 'Invalid participation ID' });
     }
 
-    // Run within a transaction session
+    const { approved_by } = req.body;
+
     const resultData = await runInTransaction(async (session) => {
       const participation = await db.collection('employee_participations').findOne({ _id: partId }, { session });
       if (!participation) {
         throw new Error('Participation record not found');
       }
 
-      if (participation.status !== 'pending') {
-        throw new Error(`Participation has already been resolved with status: ${participation.status}`);
+      if (participation.approval_status !== 'Pending') {
+        throw new Error(`Participation has already been resolved with status: ${participation.approval_status}`);
       }
 
-      const activity = await db.collection('csr_activities').findOne({ _id: participation.activity_id }, { session });
+      const activity = await db.collection('csr_activities').findOne({ _id: participation.csr_activity_id }, { session });
       if (!activity) {
         throw new Error('CSR Activity referenced in participation does not exist');
       }
 
-      // Check evidence: proof_url is required if activity proof_required is flagged
-      if (activity.proof_required && (!participation.proof_url || participation.proof_url.trim() === '')) {
-        throw new Error('Evidence proof_url is required for this activity, but was not provided');
+      // Check evidence: proof is required if activity evidence_required is flagged
+      const proofVal = participation.proof_url || participation.proof_file_name;
+      if (activity.evidence_required && (!proofVal || proofVal.trim() === '')) {
+        throw new Error('Evidence proof is required for this activity, but was not provided');
       }
 
-      // credit points & XP via points ledger
+      // credit points via points ledger
       const pointsToAdd = activity.points || 0;
-      const xpToAdd = activity.xp || 0;
       await recordPointsTransaction(
         db, 
         participation.employee_id, 
         pointsToAdd, 
-        xpToAdd, 
+        0, // 0 XP
         `CSR activity approved: ${activity.title}`, 
-        session
+        session,
+        { source_type: 'CSR_PARTICIPATION', source_id: partId }
       );
 
       // run badge evaluation
       await evaluateBadges(db, participation.employee_id, session);
 
-      // insert notification
+      // insert notification (matching official notifications table)
       await db.collection('notifications').insertOne({
-        employee_id: participation.employee_id,
+        org_id: participation.org_id || 'org-eco',
+        recipient_user_id: participation.employee_id,
+        event_type: 'CSR_APPROVAL',
         title: 'CSR Activity Approved',
-        message: `Your participation in "${activity.title}" was approved! +${pointsToAdd} Points, +${xpToAdd} XP.`,
-        type: 'approval',
-        read: false,
-        timestamp: new Date()
+        body: `Your participation in "${activity.title}" was approved! +${pointsToAdd} Points.`,
+        entity_type: 'csr_participation',
+        entity_id: partId,
+        read_at: null,
+        created_at: new Date()
       }, { session });
 
-      // mark approved
+      // mark approved in DB
       await db.collection('employee_participations').updateOne(
         { _id: partId },
         {
           $set: {
-            status: 'approved',
-            points_credited: pointsToAdd,
-            xp_credited: xpToAdd,
+            approval_status: 'Approved',
+            points_earned: pointsToAdd,
+            approved_by: toDbId(approved_by) || 'u-admin',
             approved_at: new Date()
           }
         },
@@ -262,16 +284,14 @@ router.post('/participations/:id/approve', async (req, res) => {
 
       return {
         _id: partId,
-        status: 'approved',
-        points_credited: pointsToAdd,
-        xp_credited: xpToAdd
+        approval_status: 'Approved',
+        points_earned: pointsToAdd
       };
     });
 
     return res.status(200).json({ success: true, data: resultData });
   } catch (error) {
     console.error('Error approving CSR participation:', error);
-    // Determine if it was validation failure or db error to return suitable status code
     const isValidationError = error.message.includes('not found') || 
                             error.message.includes('required') || 
                             error.message.includes('already been');
@@ -283,48 +303,54 @@ router.post('/participations/:id/approve', async (req, res) => {
 router.post('/participations/:id/reject', async (req, res) => {
   try {
     const db = getDB();
-    const partId = toObjectId(req.params.id);
+    const partId = toDbId(req.params.id);
     if (!partId) {
       return res.status(400).json({ success: false, error: 'Invalid participation ID' });
     }
+
+    const { approved_by } = req.body;
 
     const participation = await db.collection('employee_participations').findOne({ _id: partId });
     if (!participation) {
       return res.status(404).json({ success: false, error: 'Participation not found' });
     }
 
-    if (participation.status !== 'pending') {
-      return res.status(400).json({ success: false, error: `Participation has already been resolved with status: ${participation.status}` });
+    if (participation.approval_status !== 'Pending') {
+      return res.status(400).json({ success: false, error: `Participation has already been resolved with status: ${participation.approval_status}` });
     }
 
-    const activity = await db.collection('csr_activities').findOne({ _id: participation.activity_id });
+    const activity = await db.collection('csr_activities').findOne({ _id: participation.csr_activity_id });
 
     // Mark as rejected
     await db.collection('employee_participations').updateOne(
       { _id: partId },
       {
         $set: {
-          status: 'rejected',
-          rejected_at: new Date()
+          approval_status: 'Rejected',
+          approved_by: toDbId(approved_by) || 'u-admin',
+          approved_at: new Date()
         }
       }
     );
 
     // Insert notification
     await db.collection('notifications').insertOne({
-      employee_id: participation.employee_id,
+      org_id: participation.org_id || 'org-eco',
+      recipient_user_id: participation.employee_id,
+      event_type: 'CSR_REJECTION',
       title: 'CSR Activity Rejected',
-      message: `Your participation in "${activity ? activity.title : 'CSR Activity'}" was not approved.`,
-      type: 'rejection',
-      read: false,
-      timestamp: new Date()
+      body: `Your participation in "${activity ? activity.title : 'CSR Activity'}" was not approved.`,
+      entity_type: 'csr_participation',
+      entity_id: partId,
+      read_at: null,
+      created_at: new Date()
     });
 
     return res.status(200).json({
       success: true,
       data: {
         _id: partId,
-        status: 'rejected'
+        approval_status: 'Rejected'
       }
     });
   } catch (error) {

@@ -1,4 +1,4 @@
-# EcoSphere ESG Platform API Documentation
+# EcoSphere ESG Platform API Documentation (Official Schema Version)
 
 EcoSphere consists of two independent Express backend services sharing a single MongoDB database:
 1. **BE1 (Environmental + Social)** - Port `3001`
@@ -9,7 +9,7 @@ EcoSphere consists of two independent Express backend services sharing a single 
 ## Global Headers & Standards
 
 - **Employee Context**: Most endpoints modifying data require a header to determine the employee context:
-  - Header: `x-employee-id` (e.g., `64a7c1000000000000000001`)
+  - Header: `x-employee-id` (e.g., `'u-aditi'`)
 - **JSON Response Format**: All responses follow a standard envelope:
   ```json
   {
@@ -33,21 +33,26 @@ Retrieve carbon transactions with pagination, date range filtering, and departme
   - `limit`: Items per page (default: 10)
   - `department_id`: Filter transactions by department.
   - `employee_id`: Filter transactions by employee.
-  - `activity_type`: Filter by activity type.
-  - `start_date`, `end_date`: Date range ISO filters (matches `timestamp`).
+  - `activity_type` / `source_type`: Filter by source type.
+  - `start_date`, `end_date`: Date range ISO filters (matches `occurred_at`).
 - **Response**:
   ```json
   {
     "success": true,
     "data": [
       {
-        "_id": "64a7c9000000000000000001",
-        "employee_id": "64a7c1000000000000000001",
-        "quantity": 10,
-        "co2e": 1.2,
-        "activity_type": "flight",
-        "emission_factor_id": "64a7c2000000000000000001",
-        "timestamp": "2026-07-12T10:00:00.000Z"
+        "_id": "ct-1",
+        "org_id": "org-eco",
+        "department_id": "dept-log",
+        "source_type": "Fleet",
+        "quantity": 120,
+        "unit": "liters",
+        "emission_factor_id": "ef-fleet",
+        "calculated_co2e": 321.6,
+        "co2e": 321.6,
+        "calculation_mode": "AUTO",
+        "occurred_at": "2026-07-10T00:00:00.000Z",
+        "created_at": "2026-07-12T10:00:00.000Z"
       }
     ],
     "page": 1,
@@ -57,15 +62,15 @@ Retrieve carbon transactions with pagination, date range filtering, and departme
   ```
 
 #### `POST /api/environmental/transactions`
-Log a carbon transaction. The `co2e` value is computed server-side (`quantity * emission_factor.co2e_per_unit`).
+Log a carbon transaction. The `calculated_co2e` value is computed server-side (`quantity * emission_factor.co2e_per_unit`).
 - **Headers**:
   - `x-employee-id`: Employee ID logging the transaction.
 - **Request Body**:
   ```json
   {
-    "quantity": 10,
-    "activity_type": "flight",
-    "emission_factor_id": "64a7c2000000000000000001"
+    "quantity": 120,
+    "activity_type": "Fleet",
+    "emission_factor_id": "ef-fleet"
   }
   ```
 - **Response**:
@@ -73,27 +78,32 @@ Log a carbon transaction. The `co2e` value is computed server-side (`quantity * 
   {
     "success": true,
     "data": {
-      "_id": "64a7c9000000000000000001",
-      "employee_id": "64a7c1000000000000000001",
-      "quantity": 10,
-      "co2e": 1.2,
-      "activity_type": "flight",
-      "emission_factor_id": "64a7c2000000000000000001",
-      "timestamp": "2026-07-12T10:00:00.000Z"
+      "_id": "some-inserted-id",
+      "org_id": "org-eco",
+      "department_id": "dept-mfg",
+      "emission_factor_id": "ef-fleet",
+      "source_type": "Fleet",
+      "quantity": 120,
+      "unit": "liters",
+      "calculated_co2e": 321.6,
+      "co2e": 321.6,
+      "calculation_mode": "MANUAL",
+      "occurred_at": "2026-07-12T10:00:00.000Z",
+      "created_by": "u-aditi",
+      "created_at": "2026-07-12T10:00:00.000Z"
     }
   }
   ```
 
 #### `POST /api/environmental/auto-calculate`
-Automatically lookup the emission factor matching `activity_type` + `source_module`, compute `co2e` server-side, and save.
+Automatically lookup the emission factor matching `source_type`, compute `calculated_co2e` server-side, and save.
 - **Headers**:
   - `x-employee-id`: Employee logging the transaction.
 - **Request Body**:
   ```json
   {
-    "quantity": 10,
-    "activity_type": "flight",
-    "source_module": "travel"
+    "quantity": 400,
+    "source_type": "Manufacturing"
   }
   ```
 - **Response**:
@@ -101,14 +111,19 @@ Automatically lookup the emission factor matching `activity_type` + `source_modu
   {
     "success": true,
     "data": {
-      "_id": "64a7c9500000000000000001",
-      "employee_id": "64a7c1000000000000000001",
-      "quantity": 10,
-      "co2e": 1.2,
-      "activity_type": "flight",
-      "emission_factor_id": "64a7c2000000000000000001",
-      "timestamp": "2026-07-12T10:05:00.000Z",
-      "auto_calculated": true
+      "_id": "some-inserted-id",
+      "org_id": "org-eco",
+      "department_id": "dept-mfg",
+      "emission_factor_id": "ef-mfg",
+      "source_type": "Manufacturing",
+      "quantity": 400,
+      "unit": "units",
+      "calculated_co2e": 168.0,
+      "co2e": 168.0,
+      "calculation_mode": "AUTO",
+      "occurred_at": "2026-07-12T10:00:00.000Z",
+      "created_by": "u-aditi",
+      "created_at": "2026-07-12T10:00:00.000Z"
     }
   }
   ```
@@ -122,15 +137,19 @@ List department goals.
     "success": true,
     "data": [
       {
-        "_id": "64a7c7000000000000000001",
-        "department_id": "64a7c0000000000000000001",
-        "target_co2e": 100,
-        "deadline": "2026-12-31T00:00:00.000Z"
+        "_id": "goal-1",
+        "org_id": "org-eco",
+        "department_id": "dept-log",
+        "name": "Reduce Fleet Emissions",
+        "target_co2e": 500,
+        "current_co2e": 390,
+        "deadline": "2026-12-31T00:00:00.000Z",
+        "status": "ACTIVE"
       }
     ],
     "page": 1,
     "limit": 10,
-    "total": 1
+    "total": 3
   }
   ```
 
@@ -140,64 +159,46 @@ List department goals.
 
 #### `GET /api/social/activities`
 List available CSR activities.
-- **Query Filters**: `page`, `limit`, `category`.
+- **Query Filters**: `page`, `limit`, `category_id`.
 - **Response**:
   ```json
   {
     "success": true,
     "data": [
       {
-        "_id": "64a7c3000000000000000001",
-        "title": "Tree Planting",
-        "description": "Planting trees",
-        "category": "CSR_ACTIVITY",
+        "_id": "csr-tree",
+        "org_id": "org-eco",
+        "category_id": "cat-community",
+        "title": "Tree Plantation",
+        "description": "Plant trees with the community team.",
         "points": 50,
-        "xp": 100,
-        "difficulty": "medium",
-        "proof_required": true
+        "evidence_required": true,
+        "status": "OPEN"
       }
     ],
     "page": 1,
     "limit": 10,
-    "total": 1
+    "total": 2
   }
   ```
 
 #### `POST /api/social/activities`
-Create a CSR activity. Validates category must be `CSR_ACTIVITY` (fails with 400 otherwise).
+Create a CSR activity. Validates category must correspond to a category of type `CSR_ACTIVITY`.
 - **Request Body**:
   ```json
   {
-    "title": "Beach Cleanup",
-    "description": "Clean garbage",
-    "category": "CSR_ACTIVITY",
-    "points": 40,
-    "xp": 80,
-    "difficulty": "medium",
-    "proof_required": false
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "_id": "64a7c3500000000000000001",
-      "title": "Beach Cleanup",
-      "description": "Clean garbage",
-      "category": "CSR_ACTIVITY",
-      "points": 40,
-      "xp": 80,
-      "difficulty": "medium",
-      "proof_required": false
-    }
+    "title": "Eco Awareness Workshop",
+    "description": "Awareness session",
+    "category_id": "cat-env",
+    "points": 30,
+    "evidence_required": false
   }
   ```
 
 #### `POST /api/social/activities/:id/participate`
-Join a CSR activity as an employee. Marks participation status as `pending`.
+Join a CSR activity as an employee. Marks participation status as `Pending`.
 - **Headers**:
-  - `x-employee-id`: Joining Employee ID.
+  - `x-employee-id`: Joining Employee User ID.
 - **Request Body**:
   ```json
   {
@@ -209,51 +210,41 @@ Join a CSR activity as an employee. Marks participation status as `pending`.
   {
     "success": true,
     "data": {
-      "_id": "64a7ca000000000000000001",
-      "employee_id": "64a7c1000000000000000001",
-      "activity_id": "64a7c3000000000000000001",
-      "status": "pending",
+      "_id": "some-participation-id",
+      "org_id": "org-eco",
+      "employee_id": "u-aditi",
+      "csr_activity_id": "csr-tree",
       "proof_url": "https://example.com/tree.jpg",
-      "points_credited": 0,
-      "xp_credited": 0,
-      "timestamp": "2026-07-12T10:10:00.000Z"
+      "proof_file_name": "https://example.com/tree.jpg",
+      "approval_status": "Pending",
+      "points_earned": 0,
+      "completion_date": "2026-07-12T10:00:00.000Z",
+      "created_at": "2026-07-12T10:00:00.000Z"
     }
   }
   ```
 
 #### `POST /api/social/participations/:id/approve`
 Approves a pending participation.
-- **Transaction Flow (Server-side)**:
-  1. Checks if activity requires evidence (`proof_required`). If flagged, validation fails if `proof_url` is missing (400).
-  2. Updates status to `approved`.
-  3. Records Points and XP using points ledger (`points-ledger.js`) inside transaction context.
-  4. Evaluates badge unlocks (`badges.js`) and issues awards.
-  5. Inserts an approval notification.
+- **Transaction Flow**:
+  1. Checks if activity requires evidence (`evidence_required`). If flagged, validation fails if proof is missing.
+  2. Updates status to `Approved`.
+  3. Records points in user profile (`points_balance` incremented) and writes points ledger entry.
+  4. Evaluates badge unlocks and registers notifications.
 - **Response**:
   ```json
   {
     "success": true,
     "data": {
-      "_id": "64a7ca000000000000000001",
-      "status": "approved",
-      "points_credited": 50,
-      "xp_credited": 100
+      "_id": "participation-id",
+      "approval_status": "Approved",
+      "points_earned": 50
     }
   }
   ```
 
 #### `POST /api/social/participations/:id/reject`
-Rejects a pending participation. Marks status to `rejected` and issues notification. No points/XP ledger adjustments.
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "_id": "64a7ca000000000000000001",
-      "status": "rejected"
-    }
-  }
-  ```
+Rejects a pending participation. Marks status to `Rejected` and issues notification. No points ledger adjustments.
 
 ---
 
@@ -262,25 +253,28 @@ Rejects a pending participation. Marks status to `rejected` and issues notificat
 ### Governance Endpoints
 
 #### `GET/POST /api/governance/audits`
-- **GET**: Lists audits. Filters: `department_id`, pagination.
+- **GET**: Lists audits.
 - **POST**: Logs a new audit:
   ```json
   {
-    "title": "Q3 Social Compliance Audit",
-    "department_id": "64a7c0000000000000000001",
-    "status": "completed",
-    "findings": "All clear."
+    "title": "Q2 Waste Audit",
+    "department_id": "dept-mfg",
+    "auditor_name": "S. Nair",
+    "findings_summary": "3 minor issues",
+    "status": "Completed"
   }
   ```
 
 #### `GET/POST /api/governance/issues`
-- **GET**: Lists compliance issues. Enriches elements with a dynamic `overdue: true/false` field calculated on read if the issue is `status === 'open'` and `due_date` is in the past.
-- **POST**: Logs a compliance issue. Validation error (400) occurs if `owner_id` or `due_date` is missing.
+- **GET**: Lists compliance issues. Enriches elements with a dynamic `overdue: true/false` field calculated on read if the issue is open and past its due date.
+- **POST**: Logs a compliance issue. Validation error occurs if `owner_user_id` or `due_date` is missing.
   ```json
   {
-    "title": "Replace non-biodegradable plastics",
-    "owner_id": "64a7c1000000000000000001",
-    "due_date": "2026-07-20T00:00:00.000Z"
+    "title": "Missing MSDS sheets",
+    "owner_user_id": "u-riyer",
+    "due_date": "2026-07-18T00:00:00.000Z",
+    "department_id": "dept-mfg",
+    "severity": "High"
   }
   ```
 
@@ -289,56 +283,36 @@ Rejects a pending participation. Marks status to `rejected` and issues notificat
 ### Gamification Endpoints
 
 #### `GET/POST /api/gamification/challenges`
-- **GET**: Lists challenges. Filters: `status`, pagination.
-- **POST**: Creates a challenge in `draft` status:
-  ```json
-  {
-    "title": "Plastic Free Week",
-    "description": "Zero single-use plastic",
-    "base_xp": 100,
-    "points": 50,
-    "difficulty": "medium"
-  }
-  ```
+- **GET**: Lists challenges.
+- **POST**: Creates a challenge.
 
 #### `PATCH /api/gamification/challenges/:id/status`
 Validates challenge state transitions. Only allows progression:
-- `draft` ➔ `active` ➔ `under_review` ➔ `completed`
-- At any point, transition to `archived` is allowed.
-- Returns `400` on invalid state jump (e.g. `active` to `draft`).
-- **Request Body**:
-  ```json
-  { "status": "active" }
-  ```
+- `DRAFT` ➔ `ACTIVE` ➔ `UNDER_REVIEW` ➔ `COMPLETED`
+- At any point, transition to `ARCHIVED` is allowed.
+- Returns `400` on invalid state jump.
 
 #### `POST /api/gamification/challenges/:id/participate`
 - **Headers**: `x-employee-id`
-- **Response**: Registers employee into the challenge (`status: 'joined'`).
+- **Response**: Registers employee into the challenge (`approval_status: 'Pending'`).
 
 #### `POST /api/gamification/challenges/:id/complete`
-Marks a joined challenge as completed.
-- **Transaction Flow (Server-side)**:
+Marks a challenge participation as completed.
+- **Transaction Flow**:
   1. Validates proof evidence.
-  2. Multiplies reward XP based on difficulty:
-     - `easy`: `base_xp * 1.0`
-     - `medium`: `base_xp * 1.5`
-     - `hard`: `base_xp * 2.0`
-  3. Records Points/XP in ledger transaction, runs badge check, registers notification, sets status to `completed`.
+  2. Multiplies reward XP based on difficulty: EASY (1x), MEDIUM (1.5x), HARD (2x).
+  3. Records XP in user profile (`xp_total`), runs badge evaluation, registers notification, sets status to `Approved`.
 
 #### `GET /api/gamification/leaderboard?scope=org|department`
-Retrieve employees sorted descending by XP.
-- **Query parameters**:
-  - `scope`: `org` (entire platform) or `department` (specific department)
-  - `department_id`: Required if `scope=department`
-- **Response**: Sorted array of employee names, points, XP.
+Retrieve employees sorted descending by XP. Returns users mapped to names, points, XP.
 
 #### `POST /api/gamification/rewards/:id/redeem`
 Atomic transaction to redeem a reward.
-- **Transaction Flow (Server-side)**:
-  1. Updates reward stock: `UPDATE rewards SET stock=stock-1 WHERE id=$id AND stock>0`.
-  2. Verifies the employee's cached points balance.
-  3. Deducts points from employee (`recordPointsTransaction`) inside points-ledger.
-  4. Returns new stock. If *either* stock decrement or points balance check fails, the transaction rolls back both.
+- **Transaction Flow**:
+  1. Decrements stock: `UPDATE rewards SET stock=stock-1 WHERE id=$id AND stock>0`.
+  2. Verifies the user's cached `points_balance`.
+  3. Deducts points from user (`points_balance` decremented) and writes points ledger entry.
+  4. Returns new stock. If either stock decrement or points balance check fails, the transaction rolls back.
 
 ---
 
@@ -352,20 +326,20 @@ Fetch the environmental, social, governance, and total scores per department.
     "success": true,
     "data": [
       {
-        "department_id": "64a7c0000000000000000001",
-        "department_name": "Engineering",
-        "env_score": 100,
-        "social_score": 100,
-        "governance_score": 95,
-        "total_score": 98.5
+        "department_id": "dept-mfg",
+        "department_name": "Manufacturing",
+        "environmental_score": 84,
+        "social_score": 78,
+        "governance_score": 90,
+        "total_score": 84
       }
     ]
   }
   ```
 
 #### `POST /api/scores/recompute`
-Recompute score cached documents in database:
-- **Environmental score**: Evaluates department total co2e against the environmental goal target. Defaults to 100 if no goal target.
+Recompute scores for departments:
+- **Environmental score**: Evaluates department total `calculated_co2e` against the environmental goal target. Defaults to 100 if no goal.
 - **Social score**: Computes approved vs total CSR participation rate.
-- **Governance score**: Calculates compliance issues resolved rate, applying a -5 penalty per open issue.
+- **Governance score**: Calculates policy acknowledgements rate (`status: 'ACKNOWLEDGED'`) minus open issues penalty (-5 per open issue).
 - **Total score**: Weighted sum: `(env_score * env_weight) + (social_score * social_weight) + (governance_score * gov_weight)`.
