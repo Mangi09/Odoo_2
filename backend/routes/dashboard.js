@@ -71,7 +71,7 @@ router.get('/emissions-trend', async (req, res) => {
       }).toArray();
 
       const value = txs.reduce((s, t) => s + (t.calculated_co2e || 0), 0);
-      result.push({ month: monthLabel, value: Math.round(value * 10) / 10 });
+      result.push({ name: monthLabel, value: Math.round(value * 10) / 10 });
     }
 
     return res.json(result);
@@ -141,48 +141,42 @@ router.get('/deadlines', async (req, res) => {
 
     const goals = await db.collection('environmental_goals').find({
       org_id: orgId,
-      status: { $in: ['ACTIVE', 'ON_TRACK'] },
-      deadline: { $gte: new Date() }
+      status: { $in: ['ACTIVE', 'ON_TRACK'] }
     }).sort({ deadline: 1 }).limit(5).toArray();
-
-    const audits = await db.collection('audits').find({
-      org_id: orgId,
-      audit_date: { $gte: new Date() }
-    }).sort({ audit_date: 1 }).limit(5).toArray();
 
     const issues = await db.collection('compliance_issues').find({
       org_id: orgId,
-      status: 'Open',
-      due_date: { $gte: new Date() }
+      status: 'Open'
     }).sort({ due_date: 1 }).limit(5).toArray();
 
-    const deadlines = [
-      ...goals.map(g => ({
-        id: g._id.toString(),
-        title: g.name,
-        dueDate: (g.deadline || new Date()).toISOString().split('T')[0],
-        type: 'Environmental Goal',
-        status: g.status
-      })),
-      ...audits.map(a => ({
-        id: a._id.toString(),
-        title: a.title,
-        dueDate: (a.audit_date || new Date()).toISOString().split('T')[0],
-        type: 'Audit',
-        status: a.status || 'Pending'
-      })),
-      ...issues.map(i => ({
-        id: i._id.toString(),
-        title: i.description || 'Compliance Issue',
-        dueDate: (i.due_date || new Date()).toISOString().split('T')[0],
-        type: 'Compliance Issue',
-        status: i.status
-      }))
-    ]
-    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-    .slice(0, 8);
+    const chs = await db.collection('challenges').find({
+      org_id: orgId,
+      isActive: true
+    }).limit(5).toArray();
 
-    return res.json(deadlines);
+    return res.json({
+      goals: goals.map(g => ({
+        id: g._id.toString(),
+        name: g.name,
+        title: g.name,
+        due: (g.deadline || new Date()).toISOString().split('T')[0],
+        progress: g.status === 'Achieved' || g.status === 'COMPLETED' ? 100 : 75,
+        type: g.status
+      })),
+      challenges: chs.map(c => ({
+        id: c._id.toString(),
+        title: c.title,
+        xp: c.xpReward || 100,
+        participants: c.participants || 0,
+        deadline: c.deadline || '2026-12-31'
+      })),
+      issues: issues.map(i => ({
+        id: i._id.toString(),
+        title: i.description || i.title || 'Compliance Issue',
+        severity: i.severity || 'Medium',
+        dueDate: (i.due_date || new Date()).toISOString().split('T')[0]
+      }))
+    });
   } catch (err) {
     console.error('Dashboard deadlines error:', err);
     return res.status(500).json({ error: 'Failed to load deadlines' });

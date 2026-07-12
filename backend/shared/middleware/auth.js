@@ -24,6 +24,11 @@ async function verifyJWT(req, res, next) {
       }
     }
 
+    // 3. Fall back to query parameter (needed for file downloads via <a> tags)
+    if (!token && req.query && req.query.token) {
+      token = req.query.token;
+    }
+
     if (!token) {
       return res.status(401).json({ error: 'No authentication token provided' });
     }

@@ -1,7 +1,8 @@
 // Central API client for EcoSphere frontend
-// Reads token from localStorage, sends Bearer header
+// In dev: requests go to /api/... which Vite proxies to localhost:3001 (no CORS issues)
+// In prod: set VITE_API_URL to your backend's full URL
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 function getToken(): string | null {
   return localStorage.getItem('ecosphere_token');
