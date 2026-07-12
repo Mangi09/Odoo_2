@@ -1,19 +1,27 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Bell, CheckCircle2, ShieldAlert, Heart, Trophy, Search, Check, Info, Leaf
+  Bell, CheckCircle2, ShieldAlert, Heart, Trophy, Search, Check, Info, Leaf, RefreshCw
 } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { 
-  initialNotificationSummary, initialNotifications 
-} from '../data/mockNotificationsData';
-import type { NotificationEntry, NotificationType } from '../types/notifications';
+import { notifications as notifApi } from '../lib/api';
 
-// Reusable Components
 const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <div className={`bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 ${className}`}>
     {children}
   </div>
 );
+
+type NotificationType = 'Environmental' | 'Social' | 'Governance' | 'Gamification' | 'System';
+
+interface NotificationEntry {
+  id: string;
+  title: string;
+  description: string;
+  type: NotificationType;
+  isRead: boolean;
+  timestamp: string;
+  category: 'Today' | 'Yesterday' | 'Earlier';
+}
 
 const getIconForType = (type: NotificationType) => {
   switch (type) {
@@ -38,34 +46,83 @@ const getBgForType = (type: NotificationType) => {
 };
 
 export const Notifications = ({ activePage, onPageChange }: { activePage?: string, onPageChange?: (page: string) => void }) => {
-  const [summary, setSummary] = useState(initialNotificationSummary);
-  const [notifications, setNotifications] = useState<NotificationEntry[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<NotificationType | 'All'>('All');
 
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => {
-      if (n.id === id && !n.isRead) {
-        setSummary(s => ({ ...s, totalUnread: Math.max(0, s.totalUnread - 1) }));
-        return { ...n, isRead: true };
-      }
-      return n;
-    }));
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await notifApi.list(activeFilter === 'All' ? undefined : activeFilter);
+      
+      // Map API notifications to UI entries
+      const mapped = (data as Array<{ id: string; title: string; message: string; type: string; is_read: boolean; created_at: string }>)
+        .map(n => {
+          const date = new Date(n.created_at);
+          const diffMs = Date.now() - date.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          
+          let cat: 'Today' | 'Yesterday' | 'Earlier' = 'Earlier';
+          if (diffDays === 0) cat = 'Today';
+          else if (diffDays === 1) cat = 'Yesterday';
+
+          // Format timestamp
+          const timestamp = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + date.toLocaleDateString();
+
+          return {
+            id: n.id,
+            title: n.title,
+            description: n.message,
+            type: (n.type || 'System') as NotificationType,
+            isRead: n.is_read,
+            timestamp,
+            category: cat
+          };
+        });
+
+      setNotifications(mapped);
+    } catch (err) {
+      console.error('Failed to load notifications:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    setSummary(s => ({ ...s, totalUnread: 0 }));
+  useEffect(() => {
+    loadData();
+  }, [activeFilter]);
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await notifApi.markRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notifApi.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter(n => {
-      const matchesFilter = activeFilter === 'All' || n.type === activeFilter;
       const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             n.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
+      return matchesSearch;
     });
-  }, [notifications, searchQuery, activeFilter]);
+  }, [notifications, searchQuery]);
+
+  const totalUnread = notifications.filter(n => !n.isRead).length;
+  const complianceAlerts = notifications.filter(n => n.type === 'Governance' && !n.isRead).length;
+  const csrUpdates = notifications.filter(n => n.type === 'Social' && !n.isRead).length;
+  const badgeUnlocks = notifications.filter(n => n.type === 'Gamification' && !n.isRead).length;
 
   const todayNotifications = filteredNotifications.filter(n => n.category === 'Today');
   const yesterdayNotifications = filteredNotifications.filter(n => n.category === 'Yesterday');
@@ -74,7 +131,7 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
   const renderNotificationGroup = (title: string, group: NotificationEntry[]) => {
     if (group.length === 0) return null;
     return (
-      <div className="mb-8 last:mb-0">
+      <div className="mb-8 last:mb-0 animate-in fade-in slide-in-from-top-2">
         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">{title}</h3>
         <div className="space-y-3">
           {group.map(n => (
@@ -82,7 +139,7 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
               key={n.id} 
               className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
                 n.isRead 
-                  ? 'bg-white border-slate-100 hover:border-slate-200 opacity-70' 
+                  ? 'bg-white border-slate-100 hover:border-slate-200 opacity-75' 
                   : 'bg-indigo-50/30 border-indigo-100 hover:border-indigo-200 shadow-sm'
               }`}
             >
@@ -127,27 +184,32 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
           <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
               Notifications 
-              {summary.totalUnread > 0 && (
+              {totalUnread > 0 && (
                 <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-2.5 py-0.5 rounded-full">
-                  {summary.totalUnread} new
+                  {totalUnread} new
                 </span>
               )}
             </h1>
             <p className="text-slate-500 mt-1 text-sm">Stay updated on your ESG goals, alerts, and team activities.</p>
           </div>
           
-          <button 
-            onClick={handleMarkAllAsRead}
-            disabled={summary.totalUnread === 0}
-            className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors ${
-              summary.totalUnread > 0 
-                ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm' 
-                : 'bg-slate-50 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            Mark all as read
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => loadData()} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 shadow-sm" title="Refresh">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button 
+              onClick={handleMarkAllAsRead}
+              disabled={totalUnread === 0}
+              className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors ${
+                totalUnread > 0 
+                  ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm' 
+                  : 'bg-slate-50 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Mark all as read
+            </button>
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -158,7 +220,7 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500">Unread</p>
-              <p className="text-xl font-bold text-slate-900">{summary.totalUnread}</p>
+              <p className="text-xl font-bold text-slate-900">{loading ? '–' : totalUnread}</p>
             </div>
           </Card>
           
@@ -168,7 +230,7 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500">Alerts</p>
-              <p className="text-xl font-bold text-slate-900">{summary.complianceAlerts}</p>
+              <p className="text-xl font-bold text-slate-900">{loading ? '–' : complianceAlerts}</p>
             </div>
           </Card>
 
@@ -178,7 +240,7 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500">CSR</p>
-              <p className="text-xl font-bold text-slate-900">{summary.csrUpdates}</p>
+              <p className="text-xl font-bold text-slate-900">{loading ? '–' : csrUpdates}</p>
             </div>
           </Card>
 
@@ -188,7 +250,7 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500">Badges</p>
-              <p className="text-xl font-bold text-slate-900">{summary.badgeUnlocks}</p>
+              <p className="text-xl font-bold text-slate-900">{loading ? '–' : badgeUnlocks}</p>
             </div>
           </Card>
         </div>
@@ -226,7 +288,11 @@ export const Notifications = ({ activePage, onPageChange }: { activePage?: strin
 
           {/* List */}
           <div>
-            {filteredNotifications.length === 0 ? (
+            {loading ? (
+              <div className="space-y-4">
+                {Array(4).fill(0).map((_, i) => <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />)}
+              </div>
+            ) : filteredNotifications.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Bell className="w-6 h-6 text-slate-300" />

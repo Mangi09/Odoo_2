@@ -1,16 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Shield, AlertTriangle, FileText, CheckCircle2, Search, Clock, 
-  Activity, BookOpen, UserCheck, Plus, CheckCircle
+  Shield, AlertTriangle, FileText, CheckCircle2, Clock, 
+  BookOpen, UserCheck, CheckCircle, RefreshCw, X
 } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { 
-  initialGovernanceSummary, initialAudits, initialComplianceIssues, initialPolicies, governanceActivities 
-} from '../data/mockGovernanceData';
-import type { Audit, ComplianceIssue, Policy } from '../types/governance';
-import type { Activity as ActivityType } from '../types/dashboard';
+import { governance as govApi } from '../lib/api';
 
-// Reusable Components
 const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <div className={`bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 ${className}`}>
     {children}
@@ -28,90 +23,105 @@ const Badge = ({ children, variant = 'default' }: { children: React.ReactNode, v
   return <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[variant]}`}>{children}</span>;
 };
 
-export const Governance = ({ activePage, onPageChange }: { activePage?: string, onPageChange?: (page: string) => void }) => {
-  const [summary, setSummary] = useState(initialGovernanceSummary);
-  const [audits] = useState<Audit[]>(initialAudits);
-  const [issues, setIssues] = useState<ComplianceIssue[]>(initialComplianceIssues);
-  const [policies, setPolicies] = useState<Policy[]>(initialPolicies);
-  const [recentLog, setRecentLog] = useState<ActivityType[]>(governanceActivities);
-  const [notification, setNotification] = useState<{msg: string, type: 'success'|'info'} | null>(null);
+interface Audit { id: string; title: string; auditor: string; date: string; status: string; department: string; }
+interface ComplianceIssue { id: string; title: string; severity: 'Low' | 'Medium' | 'High' | 'Critical'; status: 'Pending' | 'Active' | 'Completed' | 'Resolved' | 'Overdue'; owner?: string; dueDate?: string; category?: string; }
+interface Policy { id: string; title: string; version: string; lastUpdated: string; isAcknowledged: boolean; description?: string; }
 
-  const showNotification = (msg: string, type: 'success' | 'info' = 'success') => {
+export const Governance = ({ activePage, onPageChange }: { activePage?: string, onPageChange?: (page: string) => void }) => {
+
+  const [audits, setAudits] = useState<Audit[]>([]);
+  const [issues, setIssues] = useState<ComplianceIssue[]>([]);
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Modals & Form State
+  const [showForm, setShowForm] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formSeverity, setFormSeverity] = useState('Medium');
+  const [formCategory, setFormCategory] = useState('Environmental');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [notification, setNotification] = useState<{msg: string, type: 'success'|'info'|'error'} | null>(null);
+
+  const showNotification = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleReportIssue = () => {
-    const newIssue: ComplianceIssue = {
-      id: `ci-${Date.now()}`,
-      title: 'Simulated Compliance Violation',
-      severity: 'High',
-      owner: 'You',
-      dueDate: new Date().toISOString().split('T')[0],
-      status: 'Open'
-    };
-    
-    setIssues([newIssue, ...issues]);
-    setSummary(prev => ({ 
-      ...prev, 
-      openIssues: prev.openIssues + 1, 
-      highSeverityIssues: prev.highSeverityIssues + 1 
-    }));
-    
-    showNotification('New compliance issue reported.', 'info');
-  };
-
-  const handleResolveIssue = (issueId: string, severity: string) => {
-    setIssues(prev => prev.map(i => i.id === issueId ? { ...i, status: 'Resolved' } : i));
-    
-    setSummary(prev => ({
-      ...prev,
-      openIssues: Math.max(0, prev.openIssues - 1),
-      highSeverityIssues: severity === 'High' ? Math.max(0, prev.highSeverityIssues - 1) : prev.highSeverityIssues
-    }));
-
-    const issue = issues.find(i => i.id === issueId);
-    if (issue) {
-      const newActivity: ActivityType = {
-        id: `ga-${Date.now()}`,
-        user: 'You',
-        action: 'resolved compliance issue',
-        target: issue.title,
-        time: 'Just now',
-        type: 'governance'
-      };
-      setRecentLog([newActivity, ...recentLog]);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [auds, iss, pols] = await Promise.all([
+        govApi.audits(),
+        govApi.issues(),
+        govApi.policies()
+      ]);
+      setAudits(auds as Audit[]);
+      setIssues(iss as ComplianceIssue[]);
+      setPolicies(pols as Policy[]);
+    } catch (err) {
+      console.error(err);
+      showNotification('Failed to load compliance data', 'error');
+    } finally {
+      setLoading(false);
     }
-
-    showNotification('Issue marked as resolved!');
   };
 
-  const handleAcknowledgePolicy = (policyId: string) => {
-    setPolicies(prev => prev.map(p => p.id === policyId ? { ...p, isAcknowledged: true } : p));
-    
-    // Recalculate percentage
-    setPolicies(newPolicies => {
-      const ackCount = newPolicies.filter(p => p.isAcknowledged).length;
-      const newRate = Math.round((ackCount / newPolicies.length) * 100);
-      setSummary(prev => ({ ...prev, policyComplianceRate: newRate }));
-      return newPolicies;
-    });
+  useEffect(() => {
+    loadData();
+  }, []);
 
-    const policy = policies.find(p => p.id === policyId);
-    if (policy) {
-      const newActivity: ActivityType = {
-        id: `ga-${Date.now()}`,
-        user: 'You',
-        action: 'acknowledged policy',
-        target: policy.title,
-        time: 'Just now',
-        type: 'governance'
-      };
-      setRecentLog([newActivity, ...recentLog]);
+  const handleReportIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formTitle.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await govApi.createIssue({
+        title: formTitle,
+        severity: formSeverity,
+        category: formCategory
+      });
+      showNotification('New compliance issue reported successfully.', 'success');
+      setShowForm(false);
+      setFormTitle('');
+      await loadData();
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      showNotification(e.message || 'Failed to report issue', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    showNotification('Policy successfully acknowledged!');
   };
+
+  const handleResolveIssue = async (issueId: string) => {
+    try {
+      await govApi.resolveIssue(issueId, 'Resolved');
+      showNotification('Issue marked as resolved!');
+      await loadData();
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      showNotification(e.message || 'Failed to resolve issue', 'error');
+    }
+  };
+
+  const handleAcknowledgePolicy = async (policyId: string) => {
+    try {
+      await govApi.acknowledge(policyId);
+      showNotification('Policy successfully acknowledged!');
+      await loadData();
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      showNotification(e.message || 'Failed to acknowledge policy', 'error');
+    }
+  };
+
+  const openIssues = issues.filter(i => i.status !== 'Resolved' && i.status !== 'Completed');
+  const highSeverityIssues = openIssues.filter(i => i.severity === 'High' || i.severity === 'Critical');
+  const upcomingAudits = audits.filter(a => a.status !== 'Completed');
+  const policyComplianceRate = policies.length > 0 
+    ? Math.round((policies.filter(p => p.isAcknowledged).length / policies.length) * 100) 
+    : 100;
 
   return (
     <DashboardLayout activePage={activePage} onPageChange={onPageChange}>
@@ -119,9 +129,13 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
         
         {/* Notification Toast */}
         {notification && (
-          <div className="fixed top-20 right-8 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2">
+          <div className={`fixed top-20 right-8 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2 ${
+            notification.type === 'error' ? 'bg-red-600' : 'bg-slate-800'
+          }`}>
             {notification.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-green-400" />
+            ) : notification.type === 'error' ? (
+              <AlertTriangle className="w-5 h-5 text-white" />
             ) : (
               <AlertTriangle className="w-5 h-5 text-yellow-400" />
             )}
@@ -138,18 +152,83 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
           
           <div className="flex items-center gap-3">
             <button 
-              onClick={handleReportIssue}
+              onClick={() => loadData()}
+              className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 shadow-sm"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button 
+              onClick={() => setShowForm(true)}
               className="px-4 py-2.5 bg-red-50 text-red-700 border border-red-100 rounded-xl text-sm font-medium hover:bg-red-100 transition-all flex items-center gap-2"
             >
               <AlertTriangle className="w-4 h-4" />
               Report Issue
             </button>
-            <button className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              New Policy
-            </button>
           </div>
         </div>
+
+        {/* Form Modal */}
+        {showForm && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-100 animate-in zoom-in-95">
+              <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900">Report Compliance Issue</h3>
+                <button onClick={() => setShowForm(false)} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+              <form onSubmit={handleReportIssue} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Issue Title</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={formTitle}
+                    onChange={e => setFormTitle(e.target.value)}
+                    placeholder="Describe the compliance issue..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Severity</label>
+                    <select 
+                      value={formSeverity} 
+                      onChange={e => setFormSeverity(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none"
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                    <select 
+                      value={formCategory} 
+                      onChange={e => setFormCategory(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none"
+                    >
+                      <option value="Environmental">Environmental</option>
+                      <option value="Social">Social</option>
+                      <option value="Governance">Governance</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -161,7 +240,7 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
             </div>
             <div>
               <h3 className="text-slate-500 font-medium text-sm mb-1">Open Issues</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.openIssues}</div>
+              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : openIssues.length}</div>
             </div>
           </Card>
 
@@ -172,8 +251,8 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">High Severity</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.highSeverityIssues}</div>
+              <h3 className="text-slate-500 font-medium text-sm mb-1">High/Critical Severity</h3>
+              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : highSeverityIssues.length}</div>
             </div>
           </Card>
 
@@ -185,7 +264,7 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
             </div>
             <div>
               <h3 className="text-slate-500 font-medium text-sm mb-1">Upcoming Audits</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.upcomingAudits}</div>
+              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : upcomingAudits.length}</div>
             </div>
           </Card>
 
@@ -197,7 +276,7 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
             </div>
             <div>
               <h3 className="text-slate-500 font-medium text-sm mb-1">Policy Compliance</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{summary.policyComplianceRate}%</div>
+              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : policyComplianceRate}%</div>
             </div>
           </Card>
         </div>
@@ -210,14 +289,6 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
             <Card>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-slate-900">Active Compliance Issues</h3>
-                <div className="relative hidden sm:block">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="Search issues..." 
-                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none w-48"
-                  />
-                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left text-slate-600">
@@ -231,24 +302,30 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                     </tr>
                   </thead>
                   <tbody>
-                    {issues.filter(i => i.status !== 'Resolved').map(issue => (
+                    {loading ? (
+                      Array(3).fill(0).map((_, i) => (
+                        <tr key={i} className="border-b border-slate-100">
+                          <td colSpan={5} className="px-4 py-3"><div className="h-6 bg-slate-100 rounded animate-pulse" /></td>
+                        </tr>
+                      ))
+                    ) : issues.filter(i => i.status !== 'Resolved' && i.status !== 'Completed').map(issue => (
                       <tr key={issue.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-900">{issue.title}</div>
-                          <div className="text-xs text-slate-500">Owner: {issue.owner}</div>
+                          <div className="text-xs text-slate-500">Category: {issue.category || 'General'}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={issue.severity === 'High' ? 'error' : issue.severity === 'Medium' ? 'warning' : 'info'}>
+                          <Badge variant={issue.severity === 'Critical' || issue.severity === 'High' ? 'error' : issue.severity === 'Medium' ? 'warning' : 'info'}>
                             {issue.severity}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 font-medium">{issue.dueDate}</td>
+                        <td className="px-4 py-3 font-medium">{issue.dueDate || 'N/A'}</td>
                         <td className="px-4 py-3">
-                          <Badge variant={issue.status === 'Open' ? 'warning' : 'info'}>{issue.status}</Badge>
+                          <Badge variant={issue.status === 'Overdue' ? 'error' : 'warning'}>{issue.status}</Badge>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button 
-                            onClick={() => handleResolveIssue(issue.id, issue.severity)}
+                            onClick={() => handleResolveIssue(issue.id)}
                             className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                           >
                             Resolve
@@ -256,7 +333,7 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                         </td>
                       </tr>
                     ))}
-                    {issues.filter(i => i.status !== 'Resolved').length === 0 && (
+                    {!loading && issues.filter(i => i.status !== 'Resolved' && i.status !== 'Completed').length === 0 && (
                       <tr>
                         <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                           No active issues! Great job.
@@ -284,7 +361,13 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                     </tr>
                   </thead>
                   <tbody>
-                    {audits.map(audit => (
+                    {loading ? (
+                      Array(2).fill(0).map((_, i) => (
+                        <tr key={i} className="border-b border-slate-100">
+                          <td colSpan={4} className="px-4 py-3"><div className="h-6 bg-slate-100 rounded animate-pulse" /></td>
+                        </tr>
+                      ))
+                    ) : audits.map(audit => (
                       <tr key={audit.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-900">{audit.title}</div>
@@ -317,7 +400,9 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                 </h3>
               </div>
               <div className="space-y-4">
-                {policies.map(policy => (
+                {loading ? (
+                  Array(3).fill(0).map((_, i) => <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />)
+                ) : policies.map(policy => (
                   <div key={policy.id} className="p-3 rounded-xl border border-slate-100 flex flex-col gap-3">
                     <div>
                       <h4 className="text-sm font-semibold text-slate-900">{policy.title}</h4>
@@ -335,35 +420,6 @@ export const Governance = ({ activePage, onPageChange }: { activePage?: string, 
                         <UserCheck className="w-4 h-4" /> Acknowledge
                       </button>
                     )}
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Activity Stream */}
-            <Card>
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-slate-400" /> Recent Activity
-                </h3>
-              </div>
-              <div className="space-y-5">
-                {recentLog.map(activity => (
-                  <div key={activity.id} className="flex gap-3">
-                    <div className="mt-0.5">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                        <Activity className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-800">
-                        <span className="font-medium text-slate-900">{activity.user}</span> {activity.action}
-                      </p>
-                      <p className="text-sm font-medium text-slate-900 mt-0.5 line-clamp-1">{activity.target}</p>
-                      <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-                        <Clock className="w-3 h-3" /> {activity.time}
-                      </div>
-                    </div>
                   </div>
                 ))}
               </div>

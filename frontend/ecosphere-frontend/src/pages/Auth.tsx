@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Leaf, Mail, Lock, Eye, EyeOff, User, Building, ShieldCheck, ArrowRight, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => void }) => {
+  const { login, signup } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,16 +42,27 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
       return;
     }
 
-    // Simulate API Call
-    setTimeout(() => {
-      setIsLoading(false);
-      if (formData.email === 'error@example.com') {
-        setError('Invalid credentials. Please try again.');
+    try {
+      if (isLogin) {
+        await login(formData.email, formData.password);
       } else {
-        onLogin();
+        await signup({
+          name: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          orgName: formData.companyName,
+        });
       }
-    }, 1500);
+      onLogin();
+    } catch (err: unknown) {
+      const e = err as { message?: string; body?: { error?: string } };
+      setError(e?.body?.error || e?.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
