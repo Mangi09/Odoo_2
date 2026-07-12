@@ -163,7 +163,7 @@ export const Dashboard = ({ activePage = 'Dashboard', onPageChange, darkMode, se
               Log Data
             </button>
           </div>
-        </div >
+        </div>
 
         {/* KPI Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -349,15 +349,13 @@ export const Dashboard = ({ activePage = 'Dashboard', onPageChange, darkMode, se
                       style={{ width: `${goal.progress}%` }}
                     />
                   </div>
-                </div >
+                </div>
               ))}
-              {
-                !loading && deadlines.length === 0 && (
-                  <p className="text-slate-500 text-sm text-center py-8">No active goals configured 🎉</p>
-                )
-              }
-            </div >
-          </Card >
+              {!loading && deadlines.length === 0 && (
+                <p className="text-slate-500 text-sm text-center py-8">No active goals configured 🎉</p>
+              )}
+            </div>
+          </Card>
 
           {/* Active Challenges */}
           <Card darkMode={darkMode}>
