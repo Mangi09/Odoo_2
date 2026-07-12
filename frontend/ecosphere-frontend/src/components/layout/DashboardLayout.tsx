@@ -75,9 +75,12 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activePage?:
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
             </button>
-            <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-medium text-sm cursor-pointer ml-2">
+            <button 
+              onClick={() => onPageChange && onPageChange('Profile')}
+              className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-medium text-sm cursor-pointer ml-2 hover:bg-slate-700 transition-colors"
+            >
               JD
-            </div>
+            </button>
           </div>
         </header>
 
