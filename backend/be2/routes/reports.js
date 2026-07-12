@@ -11,7 +11,6 @@ router.get('/esg-summary', async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
 
-    // Retrieve score aggregates matching department names
     const scores = await db.collection('department_scores').aggregate([
       {
         $lookup: {
@@ -31,10 +30,14 @@ router.get('/esg-summary', async (req, res) => {
         $project: {
           department_id: 1,
           department_name: { $ifNull: ['$department.name', 'Unknown Department'] },
-          env_score: 1,
+          environmental_score: 1,
           social_score: 1,
           governance_score: 1,
-          total_score: 1
+          total_score: 1,
+          // Compatibility fields
+          env_score: '$environmental_score',
+          period_start: 1,
+          period_end: 1
         }
       },
       { $skip: skip },
