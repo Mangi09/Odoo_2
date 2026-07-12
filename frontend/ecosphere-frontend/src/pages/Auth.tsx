@@ -65,30 +65,30 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
 
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-gray-50 flex">
       {/* Left Column: Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 xl:px-24 py-12">
         
         {/* Brand & Back */}
         <div className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-              <Leaf className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shadow-md">
+              <Leaf className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-slate-900 tracking-tight">EcoSphere</span>
+            <span className="text-xl font-bold text-gray-900 tracking-tight">EcoSphere</span>
           </div>
           {onBack && (
-            <button onClick={onBack} className="text-sm font-medium text-slate-500 hover:text-slate-900 flex items-center gap-1 transition-colors">
+            <button onClick={onBack} className="text-sm font-medium text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors">
               <ArrowLeft className="w-4 h-4" /> Back to site
             </button>
           )}
         </div>
 
         <div className="w-full max-w-md mx-auto sm:mx-0">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
             {isLogin ? 'Welcome back' : 'Create your account'}
           </h1>
-          <p className="text-slate-500 mb-8">
+          <p className="text-gray-500 mb-8">
             {isLogin 
               ? 'Enter your details to access your ESG dashboard.' 
               : 'Join EcoSphere and start tracking your sustainability impact.'}
@@ -96,7 +96,7 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
 
           {/* Social Logins */}
           <div className="grid grid-cols-2 gap-3 mb-8">
-            <button className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+            <button className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -105,7 +105,7 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
               </svg>
               Google
             </button>
-            <button className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+            <button className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 21 21">
                 <path fill="#f35325" d="M1 1h9v9H1z"/>
                 <path fill="#81bc06" d="M11 1h9v9h-9z"/>
@@ -117,8 +117,8 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
           </div>
 
           <div className="relative flex items-center justify-center mb-8">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-            <span className="relative bg-slate-50 px-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Or continue with email</span>
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+            <span className="relative bg-gray-50 px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">Or continue with email</span>
           </div>
 
           {/* Form */}
@@ -134,42 +134,42 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
             {!isLogin && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input 
                       type="text" 
                       name="fullName"
                       value={formData.fullName}
                       onChange={handleChange}
                       placeholder="Jane Doe" 
-                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Company</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
                     <div className="relative">
-                      <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input 
                         type="text" 
                         name="companyName"
                         value={formData.companyName}
                         onChange={handleChange}
                         placeholder="Acme Corp" 
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                     <select 
                       name="role"
                       value={formData.role}
                       onChange={handleChange}
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                      className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
                     >
                       <option value="Employee">Employee</option>
                       <option value="Manager">Manager</option>
@@ -181,41 +181,41 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Work Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Work Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
                   type="email" 
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="jane@company.com" 
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-slate-700">Password</label>
+                <label className="block text-sm font-medium text-gray-700">Password</label>
                 {isLogin && (
-                  <a href="#" className="text-xs font-medium text-indigo-600 hover:text-indigo-700">Forgot password?</a>
+                  <a href="#" className="text-xs font-medium text-green-600 hover:text-green-700">Forgot password?</a>
                 )}
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
                   type={showPassword ? "text" : "password"} 
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••" 
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
                 />
                 <button 
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -224,16 +224,16 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
 
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input 
                     type={showPassword ? "text" : "password"} 
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="••••••••" 
-                    className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -244,9 +244,9 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
                 <input 
                   id="remember-me" 
                   type="checkbox" 
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                  className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer" 
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 cursor-pointer">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 cursor-pointer">
                   Remember me for 30 days
                 </label>
               </div>
@@ -257,10 +257,10 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
                 <input 
                   id="terms" 
                   type="checkbox" 
-                  className="mt-1 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                  className="mt-1 w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer" 
                 />
-                <label htmlFor="terms" className="ml-2 block text-xs text-slate-500 cursor-pointer">
-                  I agree to the <a href="#" className="text-indigo-600 hover:underline">Terms of Service</a> and <a href="#" className="text-indigo-600 hover:underline">Privacy Policy</a>.
+                <label htmlFor="terms" className="ml-2 block text-xs text-gray-500 cursor-pointer">
+                  I agree to the <a href="#" className="text-green-600 hover:underline">Terms of Service</a> and <a href="#" className="text-green-600 hover:underline">Privacy Policy</a>.
                 </label>
               </div>
             )}
@@ -268,7 +268,7 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed mt-6"
+              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed mt-6 shadow-sm"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -281,7 +281,7 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
             </button>
           </form>
 
-          <p className="text-center text-sm text-slate-500 mt-8">
+          <p className="text-center text-sm text-gray-500 mt-8">
             {isLogin ? "Don't have an account?" : "Already have an account?"}
             <button 
               onClick={() => {
@@ -289,7 +289,7 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
                 setError(null);
                 setFormData({ email: '', password: '', confirmPassword: '', fullName: '', companyName: '', role: 'Employee' });
               }}
-              className="ml-1.5 font-medium text-indigo-600 hover:text-indigo-700 hover:underline focus:outline-none"
+              className="ml-1.5 font-medium text-green-600 hover:text-green-700 hover:underline focus:outline-none"
             >
               {isLogin ? 'Sign up' : 'Log in'}
             </button>
@@ -299,10 +299,10 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
       </div>
 
       {/* Right Column: Illustration */}
-      <div className="hidden lg:flex w-1/2 bg-slate-900 relative items-center justify-center overflow-hidden p-12">
+      <div className="hidden lg:flex w-1/2 bg-gray-900 relative items-center justify-center overflow-hidden p-12">
         {/* Background Gradients */}
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-green-500/20 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4"></div>
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-green-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4"></div>
         
         {/* Abstract Pattern */}
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
@@ -313,29 +313,29 @@ export const Auth = ({ onLogin, onBack }: { onLogin: () => void, onBack?: () => 
               <ShieldCheck className="w-8 h-8 text-green-400" />
               <h2 className="text-2xl font-bold">Enterprise-Grade ESG</h2>
             </div>
-            <p className="text-slate-300 text-lg leading-relaxed mb-8">
+            <p className="text-gray-300 text-lg leading-relaxed mb-8">
               "EcoSphere transformed how we track and report our sustainability metrics. It's not just a dashboard; it's the operating system for our environmental initiatives."
             </p>
             
             <div className="flex items-center gap-4 border-t border-white/10 pt-6">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-indigo-500 flex items-center justify-center font-bold text-lg">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center font-bold text-lg">
                 MC
               </div>
               <div>
                 <p className="font-semibold text-white">Michael Chen</p>
-                <p className="text-sm text-slate-400">Chief Sustainability Officer, TechFlow</p>
+                <p className="text-sm text-gray-400">Chief Sustainability Officer, TechFlow</p>
               </div>
             </div>
           </div>
 
           {/* Floating UI Elements for visual interest */}
-          <div className="absolute -right-12 -bottom-12 bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-2xl flex items-center gap-4 animate-bounce" style={{ animationDuration: '3s' }}>
+          <div className="absolute -right-12 -bottom-12 bg-gray-800 border border-gray-700 p-4 rounded-xl shadow-2xl flex items-center gap-4 animate-bounce" style={{ animationDuration: '3s' }}>
             <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
               <p className="text-white text-sm font-semibold">Q3 Report Generated</p>
-              <p className="text-slate-400 text-xs">Just now</p>
+              <p className="text-gray-400 text-xs">Just now</p>
             </div>
           </div>
         </div>

@@ -6,22 +6,31 @@ import {
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { reports as reportsApi, dashboard as dashApi } from '../lib/api';
 
-
-const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 ${className}`}>
+const Card = ({ children, className = '', darkMode = false }: { children: React.ReactNode; className?: string; darkMode?: boolean }) => (
+  <div className={`${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-green-100'} rounded-2xl shadow-sm border p-6 ${className}`}>
     {children}
   </div>
 );
 
-const Badge = ({ children, variant = 'default' }: { children: React.ReactNode, variant?: 'success' | 'warning' | 'error' | 'info' | 'default' }) => {
+const Badge = ({ children, variant = 'default', darkMode = false }: { children: React.ReactNode; variant?: 'success' | 'warning' | 'error' | 'info' | 'default'; darkMode?: boolean }) => {
   const styles = {
-    success: 'bg-green-100 text-green-700',
-    warning: 'bg-orange-100 text-orange-700',
-    error: 'bg-red-100 text-red-700',
-    info: 'bg-blue-100 text-blue-700',
-    default: 'bg-slate-100 text-slate-700'
+    success: darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-700',
+    warning: darkMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-50 text-orange-700',
+    error: darkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-700',
+    info: darkMode ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-700',
+    default: darkMode ? 'bg-slate-700 text-slate-300' : 'bg-gray-50 text-gray-700'
   };
   return <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[variant]}`}>{children}</span>;
+};
+
+const IconWrapper = ({ name, className = '' }: { name: string, className?: string }) => {
+  switch (name) {
+    case 'Leaf': return <Leaf className={className} />;
+    case 'Users': return <Users className={className} />;
+    case 'Shield': return <Shield className={className} />;
+    case 'FileText': return <FileText className={className} />;
+    default: return <FileText className={className} />;
+  }
 };
 
 interface ReportHistoryEntry {
@@ -33,7 +42,12 @@ interface ReportHistoryEntry {
   generatedAt: string;
 }
 
-export const Reports = ({ activePage, onPageChange }: { activePage?: string, onPageChange?: (page: string) => void }) => {
+export const Reports = ({ activePage, onPageChange, darkMode, setDarkMode }: {
+  activePage?: string;
+  onPageChange?: (page: string) => void;
+  darkMode?: boolean;
+  setDarkMode?: (mode: boolean) => void;
+}) => {
   const [history, setHistory] = useState<ReportHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -115,23 +129,23 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
   };
 
   const quickReportCategories = [
-    { id: '1', title: 'Environmental Disclosures', type: 'Environmental', icon: Leaf, desc: 'Carbon footprints, Scope 1/2/3 greenhouse gas emissions, energy usage metrics.' },
-    { id: '2', title: 'CSR & Community Engagement', type: 'Social', icon: Users, desc: 'Volunteer activities, hours spent, CSR points ledger, and participant directory.' },
-    { id: '3', title: 'Compliance & Audits', type: 'Governance', icon: Shield, desc: 'Outstanding compliance violations, active policies acknowledgment rate, audit logs.' },
-    { id: '4', title: 'Complete Executive ESG Report', type: 'All', icon: FileText, desc: 'High-level aggregated ESG scores, summaries from all departments, and year-over-year progress.' }
+    { id: '1', title: 'Environmental Disclosures', type: 'Environmental', icon: 'Leaf', desc: 'Carbon footprints, Scope 1/2/3 greenhouse gas emissions, energy usage metrics.' },
+    { id: '2', title: 'CSR & Community Engagement', type: 'Social', icon: 'Users', desc: 'Volunteer activities, hours spent, CSR points ledger, and participant directory.' },
+    { id: '3', title: 'Compliance & Audits', type: 'Governance', icon: 'Shield', desc: 'Outstanding compliance violations, active policies acknowledgment rate, audit logs.' },
+    { id: '4', title: 'Complete Executive ESG Report', type: 'All', icon: 'FileText', desc: 'High-level aggregated ESG scores, summaries from all departments, and year-over-year progress.' }
   ];
 
   return (
-    <DashboardLayout activePage={activePage} onPageChange={onPageChange}>
-      <div className="max-w-7xl mx-auto space-y-8 relative">
+    <DashboardLayout activePage={activePage} onPageChange={onPageChange} darkMode={darkMode} setDarkMode={setDarkMode}>
+      <div className="max-w-7xl mx-auto space-y-6 relative">
         
         {/* Notification Toast */}
         {notification && (
-          <div className="fixed top-20 right-8 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2">
+          <div className={`fixed top-20 right-8 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2 ${darkMode ? 'bg-slate-700 text-slate-100' : 'bg-gray-800 text-white'}`}>
             {notification.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-green-400" />
             ) : (
-              <FileDown className="w-5 h-5 text-blue-400" />
+              <FileDown className="w-5 h-5 text-teal-400" />
             )}
             <p className="text-sm font-medium">{notification.msg}</p>
           </div>
@@ -140,73 +154,77 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Reports & Analytics</h1>
-            <p className="text-slate-500 mt-1 text-sm">Generate, filter, and export your ESG data for stakeholders and compliance.</p>
+            <h1 className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Reports & Analytics</h1>
+            <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Generate, filter, and export your ESG data for stakeholders and compliance.</p>
           </div>
-          <button onClick={() => loadData()} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 shadow-sm">
+          <button onClick={() => loadData()} className={`p-2.5 rounded-xl shadow-sm transition-all ${
+            darkMode ? 'bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'
+          }`} title="Refresh">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
                 <FileDown className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">Reports Logged</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : history.length}</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Reports Logged</h3>
+              <div className="text-2xl font-semibold tracking-tight">{loading ? '–' : history.length}</div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
                 <LayoutDashboard className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">Overall ESG Score</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : stats.esgScore}/100</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Overall ESG Score</h3>
+              <div className="text-2xl font-semibold tracking-tight">{loading ? '–' : stats.esgScore}/100</div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-50 text-green-600'}`}>
                 <Leaf className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">Carbon Offset (t)</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : stats.carbonOffset.toFixed(1)}</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Carbon Offset (t)</h3>
+              <div className="text-2xl font-semibold tracking-tight">{loading ? '–' : stats.carbonOffset.toFixed(1)}</div>
             </div>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
+          <Card darkMode={darkMode} className="hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
                 <Shield className="w-5 h-5" />
               </div>
             </div>
             <div>
-              <h3 className="text-slate-500 font-medium text-sm mb-1">Active Targets</h3>
-              <div className="text-3xl font-bold text-slate-900 tracking-tight">{loading ? '–' : stats.activeGoals}</div>
+              <h3 className={`font-medium text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Active Targets</h3>
+              <div className="text-2xl font-semibold tracking-tight">{loading ? '–' : stats.activeGoals}</div>
             </div>
           </Card>
         </div>
 
         {/* Report Categories */}
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Reports</h3>
+          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Quick Reports</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {quickReportCategories.map(cat => (
               <div 
                 key={cat.id} 
-                className="p-5 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all group cursor-pointer"
+                className={`p-5 rounded-xl hover:shadow-md transition-all group cursor-pointer border ${
+                  darkMode ? 'bg-slate-800 border-slate-700 hover:border-green-500/50' : 'bg-white border-green-100 hover:border-green-300'
+                }`}
                 onClick={() => {
                   setSelectedModule(cat.type);
                   setSelectedFormat('PDF');
@@ -214,37 +232,39 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
                 }}
               >
                 <div className={`w-12 h-12 rounded-full mb-4 flex items-center justify-center ${
-                  cat.type === 'Environmental' ? 'bg-green-100 text-green-600' :
-                  cat.type === 'Social' ? 'bg-blue-100 text-blue-600' :
-                  cat.type === 'Governance' ? 'bg-orange-100 text-orange-600' :
-                  'bg-indigo-100 text-indigo-600'
+                  cat.type === 'Environmental' ? (darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600') :
+                  cat.type === 'Social' ? (darkMode ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-600') :
+                  cat.type === 'Governance' ? (darkMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600') :
+                  (darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600')
                 }`}>
-                  <cat.icon className="w-6 h-6" />
+                  <IconWrapper name={cat.icon} className="w-6 h-6" />
                 </div>
-                <h4 className="font-semibold text-slate-900 mb-2">{cat.title}</h4>
-                <p className="text-sm text-slate-500 line-clamp-2 mb-4">{cat.desc}</p>
-                <div className="flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
-                  <Download className="w-4 h-4 mr-1.5" /> Quick Export PDF
+                <h4 className={`font-semibold mb-2 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{cat.title}</h4>
+                <p className={`text-sm line-clamp-2 mb-4 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{cat.desc}</p>
+                <div className={`flex items-center text-sm font-medium ${darkMode ? 'text-green-400 group-hover:text-green-300' : 'text-green-600 group-hover:text-green-750'}`}>
+                  <Download className="w-4 h-4 mr-1.5" /> Export PDF
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Custom Report Builder */}
-          <Card className="lg:col-span-1 h-fit">
+          <Card darkMode={darkMode} className="lg:col-span-1 h-fit">
             <div className="flex items-center gap-2 mb-6">
-              <Filter className="w-5 h-5 text-indigo-500" />
-              <h3 className="text-lg font-semibold text-slate-900">Custom Report</h3>
+              <Filter className="w-5 h-5 text-green-500" />
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Custom Report</h3>
             </div>
             <form onSubmit={handleGenerateReport} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Module</label>
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>Module</label>
                 <select 
                   value={selectedModule}
                   onChange={(e) => setSelectedModule(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
+                  className={`w-full px-3 py-2 rounded-lg text-sm transition-all outline-none border ${
+                    darkMode ? 'bg-slate-700 border-slate-600 text-slate-200 focus:border-green-500' : 'bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:border-green-500'
+                  }`}
                 >
                   <option value="Environmental">Environmental Focus</option>
                   <option value="Social">Social Focus</option>
@@ -253,11 +273,13 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Department Filter</label>
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>Department Filter</label>
                 <select 
                   value={selectedDepartment}
                   onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
+                  className={`w-full px-3 py-2 rounded-lg text-sm transition-all outline-none border ${
+                    darkMode ? 'bg-slate-700 border-slate-600 text-slate-200 focus:border-green-500' : 'bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:border-green-500'
+                  }`}
                 >
                   <option value="All">All Departments</option>
                   <option value="HQ">Headquarters</option>
@@ -267,7 +289,7 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Format</label>
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>Format</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['PDF', 'CSV', 'XLSX'] as const).map((fmt) => (
                     <button
@@ -276,8 +298,8 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
                       onClick={() => setSelectedFormat(fmt)}
                       className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
                         selectedFormat === fmt 
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          ? (darkMode ? 'bg-green-500/20 border-green-500/30 text-green-400' : 'bg-green-55 border-green-200 text-green-700') 
+                          : (darkMode ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50')
                       }`}
                     >
                       {fmt}
@@ -289,7 +311,7 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
               <button 
                 type="submit"
                 disabled={generating}
-                className="w-full mt-2 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                className="w-full mt-2 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
                 {generating ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -303,13 +325,13 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
           </Card>
 
           {/* Report History */}
-          <Card className="lg:col-span-2">
+          <Card darkMode={darkMode} className="lg:col-span-2">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-slate-900">Generated Reports</h3>
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Generated Reports</h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-slate-600">
-                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+              <table className={`w-full text-sm text-left ${darkMode ? 'text-slate-300' : 'text-gray-650'}`}>
+                <thead className={`text-xs uppercase border-b ${darkMode ? 'text-slate-400 bg-slate-700 border-slate-600' : 'text-gray-500 bg-gray-50 border-gray-200'}`}>
                   <tr>
                     <th className="px-4 py-3 font-medium">Report Scope</th>
                     <th className="px-4 py-3 font-medium">Date</th>
@@ -321,35 +343,39 @@ export const Reports = ({ activePage, onPageChange }: { activePage?: string, onP
                 <tbody>
                   {loading ? (
                     Array(3).fill(0).map((_, i) => (
-                      <tr key={i} className="border-b border-slate-100">
+                      <tr key={i} className={`border-b ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
                         <td colSpan={5} className="px-4 py-3"><div className="h-6 bg-slate-100 rounded animate-pulse" /></td>
                       </tr>
                     ))
                   ) : history.map(item => (
-                    <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                    <tr key={item.id} className={`border-b transition-colors ${darkMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-gray-100 hover:bg-gray-50/50'}`}>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900">{item.module} Audit Segment</div>
+                        <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{item.module} Audit Segment</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5 text-slate-600">
-                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <div className={`flex items-center gap-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <Calendar className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`} />
                           {item.generatedAt.split('T')[0]}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={item.status === 'COMPLETED' ? 'success' : 'warning'}>
+                        <Badge variant={item.status === 'COMPLETED' ? 'success' : 'warning'} darkMode={darkMode}>
                           {item.status}
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-xs font-semibold text-slate-600 border border-slate-200">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold border ${
+                          darkMode ? 'bg-slate-700 border-slate-600 text-slate-300' : 'bg-gray-55 border-gray-200 text-gray-650'
+                        }`}>
                           {item.format}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button 
                           onClick={() => handleDownload(item.id)}
-                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            darkMode ? 'text-green-400 hover:bg-slate-700' : 'text-green-600 hover:bg-green-50'
+                          }`}
                           title="Download File"
                         >
                           <Download className="w-4 h-4" />

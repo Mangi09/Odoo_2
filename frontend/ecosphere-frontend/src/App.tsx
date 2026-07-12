@@ -16,6 +16,12 @@ function App() {
   const { isAuthenticated, isLoading, logout } = useAuth()
   const [showAuth, setShowAuth] = useState(false)
   const [activePage, setActivePage] = useState('Dashboard')
+  const [darkMode, setDarkMode] = useState(false)
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    setActivePage('Dashboard')
+  }
 
   if (isLoading) {
     return (
@@ -45,27 +51,27 @@ function App() {
   }
 
   return (
-    <>
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-slate-900' : 'bg-gray-50'}`}>
       {activePage === 'Environmental' ? (
-        <Environmental activePage={activePage} onPageChange={handlePageChange} />
+        <Environmental activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : activePage === 'Social' ? (
-        <Social activePage={activePage} onPageChange={handlePageChange} />
+        <Social activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : activePage === 'Gamification' ? (
-        <Gamification activePage={activePage} onPageChange={handlePageChange} />
+        <Gamification activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : activePage === 'Governance' ? (
-        <Governance activePage={activePage} onPageChange={handlePageChange} />
+        <Governance activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : activePage === 'Reports' ? (
-        <Reports activePage={activePage} onPageChange={handlePageChange} />
+        <Reports activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : activePage === 'Settings' ? (
-        <Settings activePage={activePage} onPageChange={handlePageChange} />
+        <Settings activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : activePage === 'Notifications' ? (
-        <Notifications activePage={activePage} onPageChange={handlePageChange} />
+        <Notifications activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : activePage === 'Profile' ? (
-        <Profile activePage={activePage} onPageChange={handlePageChange} />
+        <Profile activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       ) : (
-        <Dashboard activePage={activePage} onPageChange={handlePageChange} />
+        <Dashboard activePage={activePage} onPageChange={handlePageChange} darkMode={darkMode} setDarkMode={setDarkMode} />
       )}
-    </>
+    </div>
   )
 }
 

@@ -5,43 +5,56 @@ import {
 } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { settings as settingsApi } from '../lib/api';
-import { useAuth } from '../context/AuthContext';
 
-const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 ${className}`}>
+const Card = ({ children, className = '', darkMode = false }: { children: React.ReactNode; className?: string; darkMode?: boolean }) => (
+  <div className={`${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-green-100'} rounded-2xl shadow-sm border p-6 ${className}`}>
     {children}
   </div>
 );
 
-const Toggle = ({ enabled, onChange, disabled }: { enabled: boolean, onChange: () => void, disabled?: boolean }) => (
-  <button 
-    type="button" 
-    disabled={disabled}
+const Toggle = ({ enabled, onChange, darkMode = false }: { enabled: boolean, onChange: () => void, darkMode?: boolean }) => (
+  <button
+    type="button"
     onClick={onChange}
-    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-205 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 ${
+      darkMode 
+        ? (enabled ? 'bg-green-600 focus:ring-offset-slate-900' : 'bg-slate-600 focus:ring-offset-slate-900') 
+        : (enabled ? 'bg-green-600' : 'bg-gray-200')
+    }`}
   >
-    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-205 ease-in-out ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
   </button>
 );
 
-interface Department { id: string; name: string; code: string; headName?: string | null; employeeCount: number; }
-interface ESGConfig { auto_emission_enabled: boolean; evidence_required_for_csr: boolean; badge_auto_award_enabled: boolean; compliance_alerts_enabled: boolean; }
-interface Category { id: string; name: string; type: string; }
+interface Department { id: string; name: string; manager?: string; employeeCount?: number; }
+interface MasterCategory { id: string; name: string; type: string; description?: string; }
+interface OrgInfo { name: string; industry: string; employees: number; activeProjects: number; }
+interface ConfigSettings { allowEmployeeSelfLogs: boolean; autoApproveThreshold: number; enableNotifications: boolean; enablePointLedger: boolean; }
 
-export const Settings = ({ activePage, onPageChange }: { activePage?: string, onPageChange?: (page: string) => void }) => {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'Admin';
-
-  const [config, setConfig] = useState<ESGConfig | null>(null);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+export const Settings = ({ activePage, onPageChange, darkMode, setDarkMode }: {
+  activePage?: string;
+  onPageChange?: (page: string) => void;
+  darkMode?: boolean;
+  setDarkMode?: (mode: boolean) => void;
+}) => {
   const [loading, setLoading] = useState(true);
-  const [notification, setNotification] = useState<{msg: string, type: 'success'|'info'|'error'} | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [categories, setCategories] = useState<MasterCategory[]>([]);
+  const [orgInfo] = useState<OrgInfo | null>({ name: 'EcoSphere Ltd', industry: 'CleanTech / Sustainability', employees: 145, activeProjects: 12 });
+  const [config, setConfig] = useState<ConfigSettings>({
+    allowEmployeeSelfLogs: true,
+    autoApproveThreshold: 500,
+    enableNotifications: true,
+    enablePointLedger: true
+  });
+
+  const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'info' | 'error' } | null>(null);
 
   // Forms State
   const [newDeptName, setNewDeptName] = useState('');
   const [newCatName, setNewCatName] = useState('');
-  const [newCatType, setNewCatType] = useState('Environmental');
+  const [newCatType, setNewCatType] = useState<'Environmental' | 'Social' | 'Governance'>('Environmental');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showNotification = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
     setNotification({ msg, type });
@@ -51,14 +64,16 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cfg, depts, cats] = await Promise.all([
-        settingsApi.config(),
+      const [depts, cats, conf] = await Promise.all([
         settingsApi.departments(),
-        settingsApi.categories()
+        settingsApi.categories(),
+        settingsApi.config()
       ]);
-      setConfig(cfg as unknown as ESGConfig);
       setDepartments(depts as Department[]);
-      setCategories(cats as Category[]);
+      setCategories(cats as MasterCategory[]);
+      if (conf) {
+        setConfig(conf as unknown as ConfigSettings);
+      }
     } catch (err) {
       console.error(err);
       showNotification('Failed to load settings data', 'error');
@@ -71,28 +86,23 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
     loadData();
   }, []);
 
-  const handleUpdateConfig = async (key: keyof ESGConfig, val: boolean) => {
-    if (!isAdmin) {
-      showNotification('Only administrators can update ESG config', 'error');
-      return;
-    }
+  const handleUpdateConfig = async (updated: Partial<ConfigSettings>) => {
+    const nextConfig = { ...config, ...updated };
+    setConfig(nextConfig);
     try {
-      const updated = await settingsApi.updateConfig({ [key]: val });
-      setConfig(updated as unknown as ESGConfig);
-      showNotification('Configuration updated successfully');
+      await settingsApi.updateConfig(updated);
+      showNotification('Configuration saved successfully.');
     } catch (err: unknown) {
       const e = err as { message?: string };
-      showNotification(e.message || 'Failed to update config', 'error');
+      showNotification(e.message || 'Failed to save configuration', 'error');
     }
   };
 
   const handleAddDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeptName.trim()) return;
-    if (!isAdmin) {
-      showNotification('Only administrators can manage departments', 'error');
-      return;
-    }
+
+    setIsSubmitting(true);
     try {
       await settingsApi.createDepartment({ name: newDeptName });
       setNewDeptName('');
@@ -101,14 +111,12 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
     } catch (err: unknown) {
       const e = err as { message?: string };
       showNotification(e.message || 'Failed to add department', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteDepartment = async (id: string) => {
-    if (!isAdmin) {
-      showNotification('Only administrators can delete departments', 'error');
-      return;
-    }
     try {
       await settingsApi.deleteDepartment(id);
       showNotification('Department removed.', 'info');
@@ -122,10 +130,8 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
-    if (!isAdmin) {
-      showNotification('Only administrators can manage ESG categories', 'error');
-      return;
-    }
+
+    setIsSubmitting(true);
     try {
       await settingsApi.createCategory({ name: newCatName, type: newCatType });
       setNewCatName('');
@@ -134,14 +140,12 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
     } catch (err: unknown) {
       const e = err as { message?: string };
       showNotification(e.message || 'Failed to add category', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!isAdmin) {
-      showNotification('Only administrators can delete categories', 'error');
-      return;
-    }
     try {
       await settingsApi.deleteCategory(id);
       showNotification('Category removed.', 'info');
@@ -153,18 +157,18 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
   };
 
   return (
-    <DashboardLayout activePage={activePage} onPageChange={onPageChange}>
-      <div className="max-w-7xl mx-auto space-y-8 relative">
+    <DashboardLayout activePage={activePage} onPageChange={onPageChange} darkMode={darkMode} setDarkMode={setDarkMode}>
+      <div className="max-w-7xl mx-auto space-y-6 relative">
         
         {/* Notification Toast */}
         {notification && (
-          <div className="fixed top-20 right-8 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2">
+          <div className={`fixed top-20 right-8 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-top-2 ${
+            notification.type === 'error' ? 'bg-red-650' : (darkMode ? 'bg-slate-700 text-slate-100' : 'bg-gray-800 text-white')
+          }`}>
             {notification.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-green-400" />
-            ) : notification.type === 'error' ? (
-              <Info className="w-5 h-5 text-red-400" />
             ) : (
-              <Info className="w-5 h-5 text-blue-400" />
+              <Info className="w-5 h-5 text-teal-400" />
             )}
             <p className="text-sm font-medium">{notification.msg}</p>
           </div>
@@ -173,98 +177,88 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Organization Settings</h1>
-            <p className="text-slate-500 mt-1 text-sm">Configure EcoSphere parameters, manage master data, and update organization profiles.</p>
+            <h1 className={`text-2xl font-semibold tracking-tight ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Organization Settings</h1>
+            <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Configure EcoSphere parameters, manage master data, and update organization profiles.</p>
           </div>
-          <button onClick={() => loadData()} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 shadow-sm" title="Refresh">
+          <button onClick={() => loadData()} className={`p-2.5 rounded-xl shadow-sm transition-all ${
+            darkMode ? 'bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'
+          }`} title="Refresh">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           
           {/* Left Column: Config & Info */}
           <div className="lg:col-span-1 space-y-6">
             
-            <Card>
+            <Card darkMode={darkMode}>
               <div className="flex items-center gap-2 mb-6">
-                <Building className="w-5 h-5 text-slate-400" />
-                <h3 className="text-lg font-semibold text-slate-900">Organization Info</h3>
+                <Building className={`w-5 h-5 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`} />
+                <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Organization Info</h3>
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-slate-500">Company Name</label>
-                  <p className="text-sm font-semibold text-slate-900">{String(user?.orgName || 'EcoSphere ESG Enterprise')}</p>
+                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Company Name</label>
+                  <p className={`text-sm font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{loading ? '–' : orgInfo?.name}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-500">Current Role</label>
-                  <p className="text-sm font-semibold text-slate-900">{String(user?.role || '')}</p>
+                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Industry</label>
+                  <p className={`text-sm font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{loading ? '–' : orgInfo?.industry}</p>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500">Email Address</label>
-                  <p className="text-sm font-semibold text-slate-900">{String(user?.email || '')}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Employees</label>
+                    <p className={`text-sm font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{loading ? '–' : orgInfo?.employees}</p>
+                  </div>
+                  <div>
+                    <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Active Projects</label>
+                    <p className={`text-sm font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{loading ? '–' : orgInfo?.activeProjects}</p>
+                  </div>
                 </div>
               </div>
             </Card>
 
-            <Card>
+            <Card darkMode={darkMode}>
               <div className="flex items-center gap-2 mb-6">
-                <SettingsIcon className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-lg font-semibold text-slate-900">ESG Configuration</h3>
+                <SettingsIcon className={`w-5 h-5 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`} />
+                <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Global Configurations</h3>
               </div>
-              {loading ? (
-                <div className="space-y-4">
-                  <div className="h-6 bg-slate-100 rounded animate-pulse" />
-                  <div className="h-6 bg-slate-100 rounded animate-pulse" />
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold">Self Logging</h4>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Allow employees to self-log CSR activities</p>
+                  </div>
+                  <Toggle 
+                    enabled={config.allowEmployeeSelfLogs} 
+                    onChange={() => handleUpdateConfig({ allowEmployeeSelfLogs: !config.allowEmployeeSelfLogs })} 
+                    darkMode={darkMode} 
+                  />
                 </div>
-              ) : config && (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-900">Auto Emission Calc</h4>
-                      <p className="text-xs text-slate-500">Automatically calculate carbon output.</p>
-                    </div>
-                    <Toggle 
-                      enabled={config.auto_emission_enabled} 
-                      onChange={() => handleUpdateConfig('auto_emission_enabled', !config.auto_emission_enabled)}
-                      disabled={!isAdmin}
-                    />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold">Push Notifications</h4>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Enable automated browser push notices</p>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-900">CSR Evidence Required</h4>
-                      <p className="text-xs text-slate-500">Require proof URL for points credits.</p>
-                    </div>
-                    <Toggle 
-                      enabled={config.evidence_required_for_csr} 
-                      onChange={() => handleUpdateConfig('evidence_required_for_csr', !config.evidence_required_for_csr)}
-                      disabled={!isAdmin}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-900">Auto Badge Award</h4>
-                      <p className="text-xs text-slate-500">System unlocks badges dynamically.</p>
-                    </div>
-                    <Toggle 
-                      enabled={config.badge_auto_award_enabled} 
-                      onChange={() => handleUpdateConfig('badge_auto_award_enabled', !config.badge_auto_award_enabled)}
-                      disabled={!isAdmin}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-900">Compliance Alerts</h4>
-                      <p className="text-xs text-slate-500">Trigger warnings for flagged issues.</p>
-                    </div>
-                    <Toggle 
-                      enabled={config.compliance_alerts_enabled} 
-                      onChange={() => handleUpdateConfig('compliance_alerts_enabled', !config.compliance_alerts_enabled)}
-                      disabled={!isAdmin}
-                    />
-                  </div>
+                  <Toggle 
+                    enabled={config.enableNotifications} 
+                    onChange={() => handleUpdateConfig({ enableNotifications: !config.enableNotifications })} 
+                    darkMode={darkMode} 
+                  />
                 </div>
-              )}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold">Real Points Ledger</h4>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Require strict transactional auditing</p>
+                  </div>
+                  <Toggle 
+                    enabled={config.enablePointLedger} 
+                    onChange={() => handleUpdateConfig({ enablePointLedger: !config.enablePointLedger })} 
+                    darkMode={darkMode} 
+                  />
+                </div>
+              </div>
             </Card>
 
           </div>
@@ -272,146 +266,150 @@ export const Settings = ({ activePage, onPageChange }: { activePage?: string, on
           {/* Right Column: Master Data Tables */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Departments Management */}
-            <Card>
+            {/* Departments */}
+            <Card darkMode={darkMode}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-blue-500" />
-                  <h3 className="text-lg font-semibold text-slate-900">Departments</h3>
+                  <Users className="w-5 h-5 text-green-500" />
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Departments</h3>
                 </div>
               </div>
               
-              {isAdmin && (
-                <form onSubmit={handleAddDepartment} className="flex gap-2 mb-4">
-                  <input 
-                    type="text" 
-                    value={newDeptName}
-                    onChange={e => setNewDeptName(e.target.value)}
-                    placeholder="New department name..." 
-                    className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none"
-                  />
-                  <button type="submit" className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors flex items-center gap-1.5">
-                    <Plus className="w-4 h-4" /> Add
-                  </button>
-                </form>
-              )}
+              <form onSubmit={handleAddDepartment} className="flex gap-2 mb-6">
+                <input 
+                  type="text" 
+                  required
+                  value={newDeptName}
+                  onChange={e => setNewDeptName(e.target.value)}
+                  placeholder="New department name..." 
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all outline-none border ${
+                    darkMode ? 'bg-slate-700 border-slate-600 text-slate-200 focus:border-green-500' : 'bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:border-green-500'
+                  }`}
+                />
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 shrink-0"
+                >
+                  <Plus className="w-4 h-4" /> Add
+                </button>
+              </form>
 
-              <div className="overflow-x-auto border border-slate-100 rounded-xl">
-                <table className="w-full text-sm text-left text-slate-600">
-                  <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+              <div className="overflow-x-auto max-h-[250px]">
+                <table className={`w-full text-sm text-left ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+                  <thead className={`text-xs uppercase border-b ${darkMode ? 'text-slate-400 bg-slate-700 border-slate-600' : 'text-gray-500 bg-gray-50 border-gray-200'}`}>
                     <tr>
-                      <th className="px-4 py-3 font-medium">Department Name</th>
-                      <th className="px-4 py-3 font-medium">Code</th>
+                      <th className="px-4 py-3 font-medium">Department</th>
+                      <th className="px-4 py-3 font-medium">Head / Manager</th>
                       <th className="px-4 py-3 font-medium">Employees</th>
-                      {isAdmin && <th className="px-4 py-3 font-medium text-right">Actions</th>}
+                      <th className="px-4 py-3 font-medium text-right">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
                       Array(2).fill(0).map((_, i) => (
-                        <tr key={i} className="border-b border-slate-50">
+                        <tr key={i} className={`border-b ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
                           <td colSpan={4} className="px-4 py-3"><div className="h-6 bg-slate-100 rounded animate-pulse" /></td>
                         </tr>
                       ))
                     ) : departments.map(dept => (
-                      <tr key={dept.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-medium text-slate-900">{dept.name}</td>
-                        <td className="px-4 py-3">{dept.code}</td>
-                        <td className="px-4 py-3">{dept.employeeCount}</td>
-                        {isAdmin && (
-                          <td className="px-4 py-3 text-right">
-                            <button onClick={() => handleDeleteDepartment(dept.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        )}
+                      <tr key={dept.id} className={`border-b transition-colors ${darkMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-gray-100 hover:bg-gray-50/50'}`}>
+                        <td className="px-4 py-3 font-medium">{dept.name}</td>
+                        <td className="px-4 py-3">{dept.manager || 'Unassigned'}</td>
+                        <td className="px-4 py-3">{dept.employeeCount || 0}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button 
+                            onClick={() => handleDeleteDepartment(dept.id)}
+                            className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
-                    {!loading && departments.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-6 text-center text-slate-500">No departments configured.</td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
             </Card>
 
-            {/* Categories Management */}
-            <Card>
+            {/* Master Categories */}
+            <Card darkMode={darkMode}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <LayoutList className="w-5 h-5 text-green-500" />
-                  <h3 className="text-lg font-semibold text-slate-900">ESG Categories</h3>
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>Master Categories</h3>
                 </div>
               </div>
               
-              {isAdmin && (
-                <form onSubmit={handleAddCategory} className="flex flex-col sm:flex-row gap-2 mb-4">
-                  <input 
-                    type="text" 
-                    value={newCatName}
-                    onChange={e => setNewCatName(e.target.value)}
-                    placeholder="New category name..." 
-                    className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none"
-                  />
-                  <select 
-                    value={newCatType}
-                    onChange={e => setNewCatType(e.target.value)}
-                    className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none"
-                  >
-                    <option value="Environmental">Environmental</option>
-                    <option value="Social">Social</option>
-                    <option value="Governance">Governance</option>
-                  </select>
-                  <button type="submit" className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5">
-                    <Plus className="w-4 h-4" /> Add
-                  </button>
-                </form>
-              )}
+              <form onSubmit={handleAddCategory} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-6">
+                <input 
+                  type="text" 
+                  required
+                  value={newCatName}
+                  onChange={e => setNewCatName(e.target.value)}
+                  placeholder="New category..." 
+                  className={`px-3 py-2 rounded-lg text-sm transition-all outline-none border ${
+                    darkMode ? 'bg-slate-700 border-slate-600 text-slate-200 focus:border-green-500' : 'bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:border-green-500'
+                  }`}
+                />
+                <select
+                  value={newCatType}
+                  onChange={e => setNewCatType(e.target.value as any)}
+                  className={`px-3 py-2 rounded-lg text-sm outline-none border ${
+                    darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-gray-50 border-gray-200 text-gray-700'
+                  }`}
+                >
+                  <option value="Environmental">Environmental</option>
+                  <option value="Social">Social</option>
+                  <option value="Governance">Governance</option>
+                </select>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <Plus className="w-4 h-4" /> Add Category
+                </button>
+              </form>
 
-              <div className="overflow-x-auto border border-slate-100 rounded-xl">
-                <table className="w-full text-sm text-left text-slate-600">
-                  <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+              <div className="overflow-x-auto max-h-[250px]">
+                <table className={`w-full text-sm text-left ${darkMode ? 'text-slate-300' : 'text-gray-650'}`}>
+                  <thead className={`text-xs uppercase border-b ${darkMode ? 'text-slate-400 bg-slate-700 border-slate-600' : 'text-gray-500 bg-gray-50 border-gray-200'}`}>
                     <tr>
                       <th className="px-4 py-3 font-medium">Category Name</th>
-                      <th className="px-4 py-3 font-medium">ESG Pillar</th>
-                      {isAdmin && <th className="px-4 py-3 font-medium text-right">Actions</th>}
+                      <th className="px-4 py-3 font-medium">Type</th>
+                      <th className="px-4 py-3 font-medium text-right">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
                       Array(2).fill(0).map((_, i) => (
-                        <tr key={i} className="border-b border-slate-50">
+                        <tr key={i} className={`border-b ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
                           <td colSpan={3} className="px-4 py-3"><div className="h-6 bg-slate-100 rounded animate-pulse" /></td>
                         </tr>
                       ))
                     ) : categories.map(cat => (
-                      <tr key={cat.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-medium text-slate-900">{cat.name}</td>
+                      <tr key={cat.id} className={`border-b transition-colors ${darkMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-gray-100 hover:bg-gray-50/50'}`}>
+                        <td className="px-4 py-3 font-medium">{cat.name}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            cat.type === 'Environmental' ? 'bg-green-100 text-green-700' :
-                            cat.type === 'Social' ? 'bg-blue-100 text-blue-700' :
-                            'bg-orange-100 text-orange-700'
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            cat.type === 'Environmental' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
+                            cat.type === 'Social' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' :
+                            'bg-yellow-100 text-yellow-750 dark:bg-yellow-550/20 dark:text-yellow-450'
                           }`}>
                             {cat.type}
                           </span>
                         </td>
-                        {isAdmin && (
-                          <td className="px-4 py-3 text-right">
-                            <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        )}
+                        <td className="px-4 py-3 text-right">
+                          <button 
+                            onClick={() => handleDeleteCategory(cat.id)}
+                            className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
-                    {!loading && categories.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-6 text-center text-slate-500">No categories configured.</td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
