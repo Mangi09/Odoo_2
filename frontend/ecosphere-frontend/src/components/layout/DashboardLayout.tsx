@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Bell, Search, LayoutDashboard, Settings, 
-  Leaf, Users, Shield, Award, BarChart3, ChevronLeft, ChevronRight, Moon, Sun, Menu, X
+  Leaf, Users, Shield, Award, BarChart3, ChevronLeft, ChevronRight, Moon, Sun, Menu
 } from 'lucide-react';
 
 export const DashboardLayout: React.FC<{ 
