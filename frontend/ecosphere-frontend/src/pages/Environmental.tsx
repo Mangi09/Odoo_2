@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Cloud, Target, TrendingDown, Activity, 
-  CheckCircle2, Zap, Droplets, Plane, Trash2, RefreshCw, Calculator, Plus
+  CheckCircle2, Zap, Droplets, Plane, Trash2, RefreshCw, Calculator
 } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { environmental as envApi } from '../lib/api';
@@ -149,7 +149,7 @@ export const Environmental = ({ activePage, onPageChange, darkMode, setDarkMode 
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${s.bg}`}>
                 <s.icon className="w-5 h-5" />
               </div>
-              <div className={`text-2xl font-bold ${darkMode ? 'text-slate-900' : 'text-slate-900'}`}>{loading ? '–' : s.value}</div>
+              <div className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>{loading ? '–' : s.value}</div>
               <div className="text-slate-500 text-sm mt-1">{s.label}</div>
             </Card>
           ))}
